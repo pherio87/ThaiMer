@@ -1,4 +1,4 @@
-/* Gym Timer — interfaccia, audio e ciclo di vita dell'allenamento. */
+/* Thaimer — interfaccia, audio e ciclo di vita dell'allenamento. */
 (function () {
   'use strict';
   const Core = window.GymCore;
@@ -191,7 +191,7 @@
     const url = shareLink(w);
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'Gym Timer: ' + w.name, text: 'Allenamento «' + w.name + '» per Gym Timer', url });
+        await navigator.share({ title: 'Thaimer: ' + w.name, text: 'Allenamento «' + w.name + '» per Thaimer', url });
         return;
       }
     } catch (e) {
@@ -459,7 +459,7 @@
       try {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: run.w.name,
-          artist: 'Gym Timer',
+          artist: 'Thaimer',
           artwork: [{ src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' }],
         });
         navigator.mediaSession.setActionHandler('play', () => resume());

@@ -1,4 +1,4 @@
-# Gym Timer
+# Thaimer
 
 Timer a intervalli per allenamenti (HIIT, Tabata, circuiti, round di boxe), installabile come app e utilizzabile offline.
 

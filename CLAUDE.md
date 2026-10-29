@@ -1,4 +1,4 @@
-# Gym Timer
+# Thaimer
 
 PWA statica (HTML/CSS/JS vanilla, nessuna build) con timer a intervalli per allenamenti. Pubblicata su Cloudflare Pages dalla cartella `public/`. Uso personale e distribuzione agli iscritti di una palestra, in gran parte su Android.
 
