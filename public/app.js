@@ -328,6 +328,7 @@
   let duckUntil = 0;
   let duckTimer = 0;
   let holdEl = null;
+  let speechUntil = 0; // fine stimata dell'annuncio vocale in corso
   let speaking = null; // l'annuncio vocale in corso
 
   function duckSet(on) {
@@ -346,8 +347,8 @@
   }
   function duckCheck() {
     clearTimeout(duckTimer);
-    const left = duckUntil - Date.now();
-    if (speaking || left > 0) duckTimer = setTimeout(duckCheck, speaking ? 200 : left);
+    const left = Math.max(duckUntil, speechUntil) - Date.now();
+    if (left > 0) duckTimer = setTimeout(duckCheck, left);
     else duckSet(false);
   }
   // tiene la finestra aperta per holdMs, a partire da delayMs da adesso
@@ -363,6 +364,7 @@
     clearTimeout(duckTimer);
     duckUntil = 0;
     speaking = null;
+    speechUntil = 0;
     duckSet(false);
   }
 
@@ -412,11 +414,12 @@
       u.rate = 1.05;
       u.volume = Math.max(0.05, S.volume);
       if (S.audioMode === 'duck' || S.audioMode === 'clip') {
-        u.onstart = () => { speaking = u; duckSet(true); };
+        // onend su Android a volte non arriva: la durata stimata dalla lunghezza del testo è il limite massimo
+        u.onstart = () => { speaking = u; speechUntil = Date.now() + 1500 + text.length * 90; duckSet(true); duckCheck(); };
         const back = () => {
           if (speaking !== u) return; // un annuncio più recente ha preso il posto
           speaking = null;
-          duckUntil = Math.max(duckUntil, Date.now() + DUCK_PAD);
+          speechUntil = Date.now() + DUCK_PAD;
           duckCheck();
         };
         u.onend = back;
