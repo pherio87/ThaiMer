@@ -244,6 +244,38 @@ t('editor: crea un allenamento, salva, appare in home e il totale si aggiorna', 
   assert.strictEqual(w.document.querySelectorAll('#list .card').length, 7);
 });
 
+t('play/pausa: l\'icona segue lo stato', () => {
+  const { q, advance } = boot();
+  [...q('#list').querySelectorAll('.card-main')].find((b) => b.textContent.includes('Tabata')).click();
+  const hidden = (id) => q(id).hasAttribute('hidden');
+  assert.ok(!hidden('#ico-play') && hidden('#ico-pause'), 'pronto: play');
+  q('#run-toggle').click();
+  advance(300);
+  assert.ok(hidden('#ico-play') && !hidden('#ico-pause'), 'in corso: pausa');
+  q('#run-toggle').click();
+  assert.ok(!hidden('#ico-play') && hidden('#ico-pause'), 'in pausa: play');
+});
+
+t('loop: dall\'editor, nasconde i campi inutili e l\'allenamento non finisce dopo 1 ora', () => {
+  const { q, w, advance } = boot();
+  q('#btn-new').click();
+  const f = q('#ed-form');
+  f.elements.name.value = 'Senza fine';
+  f.elements.work.value = '40';
+  f.elements.rest.value = '20';
+  f.elements.loop.checked = true;
+  f.dispatchEvent(new w.Event('input', { bubbles: true }));
+  assert.ok(q('[data-key="rounds"]').hidden && q('[data-key="cooldown"]').hidden);
+  f.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
+  const card = [...q('#list').querySelectorAll('.card')].find((c) => c.textContent.includes('Senza fine'));
+  assert.ok(card.textContent.includes('∞'));
+  card.querySelector('.card-main').click();
+  q('#run-toggle').click();
+  advance(3600 * 1000);
+  assert.notStrictEqual(q('#run-phase').textContent, 'COMPLETATO');
+  assert.ok(!q('#run-round').textContent.includes('/'), q('#run-round').textContent);
+});
+
 t('importa da link condiviso: mostra la conferma e aggiunge l\'allenamento senza eseguire HTML', () => {
   const Core = require(path.join(ROOT, 'core.js'));
   const shared = Core.sanitizeWorkout({ name: '<b onmouseover=alert(1)>Boxe</b>', work: 120, rest: 30, rounds: 3 });

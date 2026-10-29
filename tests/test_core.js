@@ -150,4 +150,17 @@ t('tutti i preset sono validi e la durata è sensata', () => {
   }
 });
 
+t('loop: il timeline copre ore, niente cooldown/serie, "Ultimo round" mai annunciato, il link lo conserva', () => {
+  const w = Core.sanitizeWorkout({ name: 'Loop', prepare: 10, work: 40, rest: 20, rounds: 3, sets: 4, cooldown: 60, loop: true });
+  const tl = Core.buildTimeline(w);
+  assert.strictEqual(tl.loop, true);
+  assert.ok(tl.total > 2.9 * 3600 * 1000, 'copre circa 3 ore');
+  assert.ok(tl.segs.every((g) => g.type !== 'cool' && g.type !== 'setrest'));
+  const { mcues } = Core.buildCues(tl, {});
+  assert.ok(!mcues.some((c) => /Ultimo round/.test(c.text)));
+  assert.ok(Core.summary(w).startsWith('∞'));
+  assert.strictEqual(Core.decodeShare(Core.encodeShare(w)).loop, true);
+  assert.strictEqual(Core.decodeShare(Core.encodeShare(Core.sanitizeWorkout({ work: 30 }))).loop, false);
+});
+
 console.log('\n' + passed + ' test superati');

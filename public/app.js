@@ -100,7 +100,7 @@
             h('strong', {}, w.name),
             h('span', { class: 'meta' }, Core.summary(w))),
           h('div', { class: 'card-side' },
-            h('span', { class: 'dur' }, Core.fmt(tl.total)),
+            h('span', { class: 'dur' }, tl.loop ? '∞' : Core.fmt(tl.total)),
             h('button', { class: 'btn ghost', onclick: () => openEditor(w.id) }, 'Modifica')))
       );
     }
@@ -119,6 +119,7 @@
     ['setRest', 'Pausa tra serie (s)'],
     ['cooldown', 'Defaticamento (s)'],
   ];
+  const LOOP_HIDDEN = ['rounds', 'sets', 'setRest', 'cooldown']; // senza senso se l'allenamento si ripete all'infinito
   let editingId = null;
 
   function buildEditorFields() {
@@ -127,7 +128,7 @@
     for (const [key, label] of NUM_FIELDS) {
       const [min, max] = Core.LIMITS[key];
       box.append(
-        h('label', { class: 'field' },
+        h('label', { class: 'field', 'data-key': key },
           h('span', {}, label),
           h('input', { type: 'number', name: key, inputmode: 'numeric', min, max, step: 1, required: true }))
       );
@@ -138,13 +139,17 @@
     const f = $('#ed-form');
     const o = { id: editingId || undefined, name: f.elements.name.value, exercises: f.elements.exercises.value.split('\n') };
     for (const [key] of NUM_FIELDS) o[key] = f.elements[key].value;
+    o.loop = f.elements.loop.checked;
     return Core.sanitizeWorkout(o, true);
   }
 
   function updateTotal() {
     const w = readForm();
     const tl = Core.buildTimeline(w);
-    $('#ed-total').textContent = 'Durata totale: ' + Core.fmt(tl.total) + ' · ' + tl.segs.filter((g) => g.type === 'work').length + ' intervalli di lavoro';
+    for (const key of LOOP_HIDDEN) $('[data-key="' + key + '"]').hidden = w.loop;
+    $('#ed-total').textContent = w.loop
+      ? 'Si ripete finché non lo fermi'
+      : 'Durata totale: ' + Core.fmt(tl.total) + ' · ' + tl.segs.filter((g) => g.type === 'work').length + ' intervalli di lavoro';
   }
 
   function openEditor(id) {
@@ -154,6 +159,7 @@
     f.elements.name.value = id ? w.name : '';
     for (const [key] of NUM_FIELDS) f.elements[key].value = w[key];
     f.elements.exercises.value = w.exercises.join('\n');
+    f.elements.loop.checked = w.loop;
     $('#editor-title').textContent = id ? 'Modifica allenamento' : 'Nuovo allenamento';
     for (const b of ['#ed-del', '#ed-dup', '#ed-share']) $(b).hidden = !id;
     updateTotal();
@@ -621,13 +627,14 @@
     $('#run-next').textContent = next;
     $('#run-progress').style.width = (done ? 100 : ready ? 0 : ((pos - g.start) / g.dur) * 100) + '%';
     $('#run-round').textContent = !done && !ready && (g.type === 'work' || g.type === 'rest' || g.type === 'setrest')
-      ? (tl.sets > 1 ? 'Serie ' + g.set + '/' + tl.sets + ' · ' : '') + 'Round ' + g.round + '/' + tl.rounds
+      ? (tl.sets > 1 ? 'Serie ' + g.set + '/' + tl.sets + ' · ' : '') + 'Round ' + g.round + (tl.loop ? '' : '/' + tl.rounds)
       : '';
-    $('#run-total').textContent = 'Trascorso ' + Core.fmt(pos) + ' · Rimane ' + Core.fmt(tl.total - pos);
+    $('#run-total').textContent = 'Trascorso ' + Core.fmt(pos) + (tl.loop ? '' : ' · Rimane ' + Core.fmt(tl.total - pos));
 
     const playing = run.state === 'running';
-    $('#ico-play').hidden = playing;
-    $('#ico-pause').hidden = !playing;
+    // toggleAttribute: gli <svg> non hanno la proprietà .hidden
+    $('#ico-play').toggleAttribute('hidden', playing);
+    $('#ico-pause').toggleAttribute('hidden', !playing);
     $('#run-toggle').setAttribute('aria-label', done ? 'Ricomincia' : playing ? 'Pausa' : ready ? 'Avvia' : 'Riprendi');
   }
 
