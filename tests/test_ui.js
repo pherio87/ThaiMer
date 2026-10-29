@@ -17,7 +17,7 @@ const t = (name, fn) => { fn(); passed++; console.log('ok  -', name); };
 function boot(opts = {}) {
   // ---- orologio finto ----
   const clock = { now: 1_700_000_000_000, timers: new Map(), nextId: 1 };
-  const rec = { beeps: [], spoken: [], vibes: [], session: [], toasts: [], played: 0, plays: [], pauses: [] };
+  const rec = { beeps: [], spoken: [], vibes: [], session: [], toasts: [], played: 0, plays: [], pauses: [], utts: [] };
 
   const dom = new JSDOM(html, {
     url: 'https://gym.example/' + (opts.hash || ''),
@@ -40,7 +40,7 @@ function boot(opts = {}) {
         resume() { return Promise.resolve(); } addEventListener() {}
       };
       w.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
-      w.speechSynthesis = { speak: (u) => rec.spoken.push(u.text), cancel() {}, getVoices: () => [] };
+      w.speechSynthesis = { speak: (u) => { rec.spoken.push(u.text); rec.utts.push(u); }, cancel() {}, getVoices: () => [] };
       Object.defineProperty(w.navigator, 'vibrate', { value: (p) => { rec.vibes.push(p); return true; } });
       Object.defineProperty(w.navigator, 'audioSession', { value: { set type(v) { rec.session.push(v); } } });
       w.HTMLMediaElement.prototype.play = function () { rec.played++; rec.plays.push({ src: this.src, at: clock.now, loop: this.loop }); return Promise.resolve(); };
@@ -224,6 +224,18 @@ t('abbassamento continuo: da 0,5 s prima del conto alla rovescia fino a 0,5 s do
   assert.ok(Math.abs((hold[0].at - t0) / 1000 - 6.5) <= 0.11, 'parte a 6,5 s: ' + (hold[0].at - t0) / 1000);
   const off = rec.pauses.filter((p) => p.loop).map((p) => (p.at - t0) / 1000);
   assert.ok(off.length >= 1 && off[0] > 10.6, 'non si ferma tra un bip e l altro né prima della fine del «via» + 0,5 s: ' + off.join(','));
+});
+
+t('abbassamento: se la voce non segnala mai la fine, la musica risale comunque', () => {
+  const { q, advance, rec, clock } = boot({ settings: { audioMode: 'clip' } });
+  [...q('#list').querySelectorAll('.card-main')].find((b) => b.textContent.includes('Tabata')).click();
+  const t0 = clock.now;
+  q('#run-toggle').click();
+  advance(10_200);
+  rec.utts[rec.utts.length - 1].onstart(); // inizia a parlare, onend non arriverà mai
+  advance(20_000);
+  const off = rec.pauses.filter((p) => p.loop).map((p) => (p.at - t0) / 1000);
+  assert.ok(off.length >= 1 && off[0] < 18, 'il clip di tenuta si ferma comunque: ' + off.join(','));
 });
 
 t('abbassamento continuo (duck): un solo transient per tutto il conto alla rovescia', () => {
