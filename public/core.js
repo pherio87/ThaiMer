@@ -41,10 +41,14 @@
       const [min, max, def] = LIMITS[k];
       w[k] = clampInt(o[k], min, max, def);
     }
+    w.loop = o.loop === true;
     const ex = Array.isArray(o.exercises) ? o.exercises : [];
     w.exercises = ex.map((x) => cleanText(x, 40)).filter(Boolean).slice(0, 40);
     return w;
   }
+
+  // ponytail: il loop è una sequenza lunga LOOP_MS, non infinita; a fine corsa l'allenamento si conclude. Se serve di più, alzare il valore.
+  const LOOP_MS = 3 * 3600 * 1000;
 
   /** Costruisce la sequenza di fasi. Tutti i tempi in millisecondi. */
   function buildTimeline(w) {
@@ -52,19 +56,22 @@
     const add = (type, secs, label, extra) => {
       if (secs > 0) segs.push(Object.assign({ type, dur: secs * 1000, label }, extra || {}));
     };
+    const loop = w.loop === true;
+    const rounds = loop ? Math.ceil(LOOP_MS / ((w.work + w.rest) * 1000)) : w.rounds;
+    const sets = loop ? 1 : w.sets;
     const exAt = (r) => (w.exercises.length ? w.exercises[(r - 1) % w.exercises.length] : '');
 
     add('prep', w.prepare, 'Preparati');
     add('warmup', w.warmup, 'Riscaldamento');
-    for (let s = 1; s <= w.sets; s++) {
-      for (let r = 1; r <= w.rounds; r++) {
+    for (let s = 1; s <= sets; s++) {
+      for (let r = 1; r <= rounds; r++) {
         const ex = exAt(r);
         add('work', w.work, ex || 'Lavoro', { set: s, round: r, ex });
-        if (r < w.rounds) add('rest', w.rest, 'Riposo', { set: s, round: r, next: exAt(r + 1) });
+        if (r < rounds) add('rest', w.rest, 'Riposo', { set: s, round: r, next: exAt(r + 1) });
       }
-      if (s < w.sets) add('setrest', w.setRest, 'Pausa tra le serie', { set: s, round: w.rounds, next: exAt(1) });
+      if (s < sets) add('setrest', w.setRest, 'Pausa tra le serie', { set: s, round: rounds, next: exAt(1) });
     }
-    add('cool', w.cooldown, 'Defaticamento');
+    add('cool', loop ? 0 : w.cooldown, 'Defaticamento');
 
     let t = 0;
     for (const g of segs) {
@@ -72,7 +79,7 @@
       t += g.dur;
       g.end = t;
     }
-    return { segs, total: t, rounds: w.rounds, sets: w.sets };
+    return { segs, total: t, rounds, sets, loop };
   }
 
   const START_SOUND = { prep: 'soft', warmup: 'soft', work: 'go', rest: 'rest', setrest: 'set', cool: 'soft' };
@@ -109,7 +116,7 @@
           break;
         case 'work': {
           const lastRound = g.round === tl.rounds && g.set === tl.sets;
-          const prefix = (g.round === 1 && tl.sets > 1 ? 'Serie ' + g.set + '. ' : '') + (lastRound && tl.rounds > 1 ? 'Ultimo round. ' : '');
+          const prefix = (g.round === 1 && tl.sets > 1 ? 'Serie ' + g.set + '. ' : '') + (lastRound && tl.rounds > 1 && !tl.loop ? 'Ultimo round. ' : '');
           text = prefix + (g.ex || 'Round ' + g.round);
           vib = [250];
           break;
@@ -188,7 +195,9 @@
   }
 
   function summary(w) {
-    let s = w.rounds + '×(' + fmtShort(w.work) + (w.rest ? ' + ' + fmtShort(w.rest) : '') + ')';
+    const cycle = fmtShort(w.work) + (w.rest ? ' + ' + fmtShort(w.rest) : '');
+    if (w.loop) return '∞ (' + cycle + ')' + (w.exercises.length ? ' · ' + w.exercises.length + ' esercizi' : '');
+    let s = w.rounds + '×(' + cycle + ')';
     if (w.sets > 1) s += ' · ' + w.sets + ' serie';
     if (w.exercises.length) s += ' · ' + w.exercises.length + ' esercizi';
     return s;
@@ -211,6 +220,7 @@
 
   function encodeShare(w) {
     const o = { v: 1, n: w.name, pr: w.prepare, wu: w.warmup, w: w.work, r: w.rest, ro: w.rounds, s: w.sets, sr: w.setRest, cd: w.cooldown };
+    if (w.loop) o.lp = 1;
     if (w.exercises.length) o.ex = w.exercises;
     return toB64(JSON.stringify(o));
   }
@@ -221,7 +231,7 @@
       if (!str || str.length > 6000) return null;
       const o = JSON.parse(fromB64(str));
       if (!o || o.v !== 1) return null;
-      return sanitizeWorkout({ name: o.n, prepare: o.pr, warmup: o.wu, work: o.w, rest: o.r, rounds: o.ro, sets: o.s, setRest: o.sr, cooldown: o.cd, exercises: o.ex }, false);
+      return sanitizeWorkout({ name: o.n, prepare: o.pr, warmup: o.wu, work: o.w, rest: o.r, rounds: o.ro, sets: o.s, setRest: o.sr, cooldown: o.cd, exercises: o.ex, loop: o.lp === 1 }, false);
     } catch (e) {
       return null;
     }

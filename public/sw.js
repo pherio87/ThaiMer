@@ -1,5 +1,5 @@
 /* Service worker: tutto in cache per l'uso offline; si aggiorna in automatico alla visita successiva online. */
-const CACHE = 'gym-timer-v2';
+const CACHE = 'gym-timer-v3';
 const ASSETS = [
   './',
   './index.html',
