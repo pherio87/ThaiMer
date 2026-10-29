@@ -317,8 +317,58 @@
     Object.keys(NOTES).forEach(clipFor);
   }
 
+  /* ---- finestra di abbassamento (modalità «clip» e «duck») ----
+     Una sola finestra continua: si apre DUCK_PAD prima di ogni suono e resta aperta finché c'è un suono
+     in arrivo o la voce sta parlando; si chiude DUCK_PAD dopo l'ultimo. Così il conto alla rovescia 3-2-1
+     e l'annuncio successivo tengono la musica bassa senza rialzarla tra un bip e l'altro.
+     In «clip» la finestra è tenuta da un clip silenzioso di 1 s in loop (breve, come i bip, perché Android
+     lo tratti come priorità transitoria e abbassi la musica invece di fermarla). */
+  const DUCK_PAD = 500;
+  let duckOn = false;
+  let duckUntil = 0;
+  let duckTimer = 0;
+  let holdEl = null;
+  let speaking = null; // l'annuncio vocale in corso
+
+  function duckSet(on) {
+    if (on === duckOn) return;
+    duckOn = on;
+    if (S.audioMode === 'duck') setSession(on ? 'transient' : 'ambient');
+    if (S.audioMode === 'clip') {
+      if (!holdEl) {
+        holdEl = new Audio();
+        holdEl.loop = true;
+        holdEl.src = keepAliveUrl();
+      }
+      if (on) holdEl.play().catch(() => {});
+      else holdEl.pause();
+    }
+  }
+  function duckCheck() {
+    clearTimeout(duckTimer);
+    const left = duckUntil - Date.now();
+    if (speaking || left > 0) duckTimer = setTimeout(duckCheck, speaking ? 200 : left);
+    else duckSet(false);
+  }
+  // tiene la finestra aperta per holdMs, a partire da delayMs da adesso
+  function duckHold(delayMs, holdMs) {
+    if (S.audioMode !== 'clip' && S.audioMode !== 'duck') return;
+    timers.push(setTimeout(() => {
+      duckUntil = Math.max(duckUntil, Date.now() + holdMs);
+      duckSet(true);
+      duckCheck();
+    }, Math.max(0, delayMs)));
+  }
+  function duckReset() {
+    clearTimeout(duckTimer);
+    duckUntil = 0;
+    speaking = null;
+    duckSet(false);
+  }
+
   // delay = secondi da adesso al momento in cui il suono deve essere udibile
   function playCue(name, delay) {
+    duckHold(delay * 1000 - DUCK_PAD, DUCK_PAD * 2 + soundDur(name) * 1000);
     if (S.audioMode === 'clip') {
       const el = clipFor(name);
       timers.push(setTimeout(() => {
@@ -332,11 +382,6 @@
     }
     const when = ctx.currentTime + delay;
     for (const n of NOTES[name]) tone(when + n.at, n.f, n.d, { gain: n.g, type: n.type });
-    if (S.audioMode === 'duck') {
-      const ms = delay * 1000;
-      timers.push(setTimeout(() => setSession('transient'), Math.max(0, ms - 150)));
-      timers.push(setTimeout(() => setSession('ambient'), ms + soundDur(name) * 1000 + 400));
-    }
   }
 
   function cancelScheduled() {
@@ -349,7 +394,7 @@
     for (const el of Object.values(clips)) {
       try { el.pause(); } catch (e) { /* ignora */ }
     }
-    if (S.audioMode === 'duck') setSession('ambient');
+    duckReset();
   }
 
   function itVoice() {
@@ -366,9 +411,14 @@
       if (v) u.voice = v;
       u.rate = 1.05;
       u.volume = Math.max(0.05, S.volume);
-      if (S.audioMode === 'duck') {
-        u.onstart = () => setSession('transient');
-        const back = () => setTimeout(() => setSession('ambient'), 300);
+      if (S.audioMode === 'duck' || S.audioMode === 'clip') {
+        u.onstart = () => { speaking = u; duckSet(true); };
+        const back = () => {
+          if (speaking !== u) return; // un annuncio più recente ha preso il posto
+          speaking = null;
+          duckUntil = Math.max(duckUntil, Date.now() + DUCK_PAD);
+          duckCheck();
+        };
         u.onend = back;
         u.onerror = back;
       }
@@ -396,11 +446,14 @@
     return new Blob([buf], { type: 'audio/wav' });
   }
   let keepUrl = null;
+  function keepAliveUrl() {
+    if (!keepUrl) keepUrl = URL.createObjectURL(makeKeepAliveWav());
+    return keepUrl;
+  }
   function keepAliveStart() {
     if (S.audioMode !== 'bg') return;
     const el = $('#keep');
-    if (!keepUrl) keepUrl = URL.createObjectURL(makeKeepAliveWav());
-    if (!el.src) el.src = keepUrl;
+    if (!el.src) el.src = keepAliveUrl();
     el.play().catch(() => {});
     if ('mediaSession' in navigator) {
       try {
