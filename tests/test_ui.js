@@ -17,7 +17,7 @@ const t = (name, fn) => { fn(); passed++; console.log('ok  -', name); };
 function boot(opts = {}) {
   // ---- orologio finto ----
   const clock = { now: 1_700_000_000_000, timers: new Map(), nextId: 1 };
-  const rec = { beeps: [], spoken: [], vibes: [], session: [], toasts: [], played: 0, plays: [] };
+  const rec = { beeps: [], spoken: [], vibes: [], session: [], toasts: [], played: 0, plays: [], pauses: [] };
 
   const dom = new JSDOM(html, {
     url: 'https://gym.example/' + (opts.hash || ''),
@@ -43,8 +43,8 @@ function boot(opts = {}) {
       w.speechSynthesis = { speak: (u) => rec.spoken.push(u.text), cancel() {}, getVoices: () => [] };
       Object.defineProperty(w.navigator, 'vibrate', { value: (p) => { rec.vibes.push(p); return true; } });
       Object.defineProperty(w.navigator, 'audioSession', { value: { set type(v) { rec.session.push(v); } } });
-      w.HTMLMediaElement.prototype.play = function () { rec.played++; rec.plays.push({ src: this.src, at: clock.now }); return Promise.resolve(); };
-      w.HTMLMediaElement.prototype.pause = function () {};
+      w.HTMLMediaElement.prototype.play = function () { rec.played++; rec.plays.push({ src: this.src, at: clock.now, loop: this.loop }); return Promise.resolve(); };
+      w.HTMLMediaElement.prototype.pause = function () { rec.pauses.push({ loop: this.loop, at: clock.now }); };
       w.URL.createObjectURL = () => 'blob:' + (++blobCount) + '';
       w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
       w.confirm = () => true;
@@ -200,16 +200,40 @@ t('modalità «Abbassa la musica (Android)»: suoni come clip <audio>, anticipat
   q('#run-toggle').click();
   advance(11_000);
   assert.strictEqual(rec.beeps.length, 0, 'nessun oscillatore Web Audio');
-  const off = rec.plays.map((p) => Math.round(((p.at - t0) / 1000) * 100) / 100);
+  const beepPlays = rec.plays.filter((p) => !p.loop);
+  const off = beepPlays.map((p) => Math.round(((p.at - t0) / 1000) * 100) / 100);
   // beep a 7, 8, 9 s e «go» a 10 s → partono 0,15 s prima, quindi a 6,85 / 7,85 / 8,85 / 9,85
   for (const s of [6.85, 7.85, 8.85, 9.85]) assert.ok(off.some((x) => Math.abs(x - s) <= 0.11), 'clip a ' + s + ' s, trovati: ' + off.join(','));
-  const srcs = rec.plays.map((p) => p.src);
+  const srcs = beepPlays.map((p) => p.src);
   assert.strictEqual(srcs[0], srcs[1], 'i tick usano la stessa clip');
   assert.notStrictEqual(srcs[0], srcs[3], 'il suono «via» è una clip diversa');
   q('#run-toggle').click(); // pausa: nessuna clip in coda deve partire
   const n = rec.plays.length;
   advance(30_000);
   assert.strictEqual(rec.plays.length, n);
+});
+
+t('abbassamento continuo: da 0,5 s prima del conto alla rovescia fino a 0,5 s dopo l ultimo suono', () => {
+  const { q, advance, rec, clock } = boot({ settings: { audioMode: 'clip' } });
+  [...q('#list').querySelectorAll('.card-main')].find((b) => b.textContent.includes('Tabata')).click();
+  const t0 = clock.now;
+  q('#run-toggle').click();
+  advance(14_000);
+  const hold = rec.plays.filter((p) => p.loop);
+  assert.strictEqual(hold.length, 1, 'il clip di tenuta parte una sola volta per tutto il 3-2-1 + via');
+  assert.ok(Math.abs((hold[0].at - t0) / 1000 - 6.5) <= 0.11, 'parte a 6,5 s: ' + (hold[0].at - t0) / 1000);
+  const off = rec.pauses.filter((p) => p.loop).map((p) => (p.at - t0) / 1000);
+  assert.ok(off.length >= 1 && off[0] > 10.6, 'non si ferma tra un bip e l altro né prima della fine del «via» + 0,5 s: ' + off.join(','));
+});
+
+t('abbassamento continuo (duck): un solo transient per tutto il conto alla rovescia', () => {
+  const { q, advance, rec } = boot({ settings: { audioMode: 'duck' } });
+  [...q('#list').querySelectorAll('.card-main')].find((b) => b.textContent.includes('Tabata')).click();
+  q('#run-toggle').click();
+  advance(10_300);
+  const i = rec.session.indexOf('transient');
+  assert.ok(i >= 0, 'transient richiesto');
+  assert.ok(!rec.session.slice(i).includes('ambient'), 'nessun rialzo tra i bip: ' + rec.session.join(','));
 });
 
 t('modalità «Background garantito»: avvia l\'audio di mantenimento', () => {
