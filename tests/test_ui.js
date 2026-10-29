@@ -17,7 +17,7 @@ const t = (name, fn) => { fn(); passed++; console.log('ok  -', name); };
 function boot(opts = {}) {
   // ---- orologio finto ----
   const clock = { now: 1_700_000_000_000, timers: new Map(), nextId: 1 };
-  const rec = { beeps: [], spoken: [], vibes: [], session: [], toasts: [], played: 0, plays: [], pauses: [], utts: [] };
+  const rec = { beeps: [], spoken: [], vibes: [], session: [], toasts: [], played: 0, plays: [], pauses: [], utts: [], loads: [] };
 
   const dom = new JSDOM(html, {
     url: 'https://gym.example/' + (opts.hash || ''),
@@ -44,6 +44,7 @@ function boot(opts = {}) {
       Object.defineProperty(w.navigator, 'vibrate', { value: (p) => { rec.vibes.push(p); return true; } });
       Object.defineProperty(w.navigator, 'audioSession', { value: { set type(v) { rec.session.push(v); } } });
       w.HTMLMediaElement.prototype.play = function () { rec.played++; rec.plays.push({ src: this.src, at: clock.now, loop: this.loop }); return Promise.resolve(); };
+      w.HTMLMediaElement.prototype.load = function () { rec.loads.push({ loop: this.loop, src: this.getAttribute('src') }); };
       w.HTMLMediaElement.prototype.pause = function () { rec.pauses.push({ loop: this.loop, at: clock.now }); };
       w.URL.createObjectURL = () => 'blob:' + (++blobCount) + '';
       w.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
@@ -236,6 +237,7 @@ t('abbassamento: se la voce non segnala mai la fine, la musica risale comunque',
   advance(20_000);
   const off = rec.pauses.filter((p) => p.loop).map((p) => (p.at - t0) / 1000);
   assert.ok(off.length >= 1 && off[0] < 18, 'il clip di tenuta si ferma comunque: ' + off.join(','));
+  assert.ok(rec.loads.some((l) => l.loop && l.src === null), 'a fine finestra l elemento viene svuotato, non solo messo in pausa');
 });
 
 t('abbassamento continuo (duck): un solo transient per tutto il conto alla rovescia', () => {

@@ -336,13 +336,18 @@
     duckOn = on;
     if (S.audioMode === 'duck') setSession(on ? 'transient' : 'ambient');
     if (S.audioMode === 'clip') {
-      if (!holdEl) {
+      if (on) {
         holdEl = new Audio();
         holdEl.loop = true;
         holdEl.src = keepAliveUrl();
+        holdEl.play().catch(() => {});
+      } else if (holdEl) {
+        // pause() da sola non basta: Android rilascia la priorità audio solo quando l'elemento viene svuotato
+        holdEl.pause();
+        holdEl.removeAttribute('src');
+        holdEl.load();
+        holdEl = null;
       }
-      if (on) holdEl.play().catch(() => {});
-      else holdEl.pause();
     }
   }
   function duckCheck() {
