@@ -300,6 +300,22 @@ t('loop: dall\'editor, nasconde i campi inutili e l\'allenamento non finisce dop
   assert.ok(!q('#run-round').textContent.includes('/'), q('#run-round').textContent);
 });
 
+t('impostazioni: si aprono anche durante l\'allenamento, che continua', () => {
+  const { q, w, advance } = boot();
+  [...q('#list').querySelectorAll('.card-main')].find((b) => b.textContent.includes('Tabata')).click();
+  q('#run-toggle').click();
+  advance(2000);
+  assert.ok(q('#run-settings svg'), 'icona presente');
+  q('#run-settings').click();
+  assert.ok(q('#settings').hasAttribute('open'));
+  q('#set-volume').value = '0.5';
+  q('#set-volume').dispatchEvent(new w.Event('input'));
+  q('#settings').removeAttribute('open');
+  q('#settings').dispatchEvent(new w.Event('close'));
+  advance(10_000);
+  assert.strictEqual(q('#run-phase').textContent, 'LAVORO', 'il timer non si è fermato');
+});
+
 t('importa da link condiviso: mostra la conferma e aggiunge l\'allenamento senza eseguire HTML', () => {
   const Core = require(path.join(ROOT, 'core.js'));
   const shared = Core.sanitizeWorkout({ name: '<b onmouseover=alert(1)>Boxe</b>', work: 120, rest: 30, rounds: 3 });

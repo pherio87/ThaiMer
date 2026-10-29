@@ -52,7 +52,7 @@
   /* ------------------------------------------------------------------ */
   const KEY_W = 'gymtimer.workouts.v1';
   const KEY_S = 'gymtimer.settings.v1';
-  const DEFAULTS = { volume: 0.8, countdown: 3, voice: true, extras: true, vibrate: true, wake: true, audioMode: 'mix' };
+  const DEFAULTS = { volume: 1, countdown: 3, voice: true, extras: true, vibrate: true, wake: true, audioMode: 'mix' };
 
   let S = Object.assign({}, DEFAULTS, loadJSON(KEY_S, {}));
   let workouts = loadJSON(KEY_W, null);
@@ -242,7 +242,7 @@
   function tone(when, freq, dur, opts) {
     const o = ctx.createOscillator();
     const g = ctx.createGain();
-    const peak = (opts && opts.gain) || 0.9;
+    const peak = (opts && opts.gain) || 1;
     o.type = (opts && opts.type) || 'triangle';
     o.frequency.setValueAtTime(freq, when);
     if (opts && opts.to) o.frequency.linearRampToValueAtTime(opts.to, when + dur);
@@ -263,11 +263,11 @@
   // I suoni sono descritti come note (istante, frequenza, durata): servono sia al sintetizzatore Web Audio
   // sia al generatore di clip WAV usato dalla modalità «Abbassa la musica (Android)».
   const NOTES = {
-    tick: [{ at: 0, f: 880, d: 0.13, g: 0.8 }],
+    tick: [{ at: 0, f: 880, d: 0.13 }],
     go: [{ at: 0, f: 1175, d: 0.16 }, { at: 0.19, f: 1568, d: 0.4 }],
     rest: [{ at: 0, f: 660, d: 0.2 }, { at: 0.22, f: 494, d: 0.35 }],
     set: [{ at: 0, f: 523, d: 0.14 }, { at: 0.17, f: 659, d: 0.14 }, { at: 0.34, f: 784, d: 0.3 }],
-    soft: [{ at: 0, f: 740, d: 0.3, g: 0.7, type: 'sine' }],
+    soft: [{ at: 0, f: 740, d: 0.3, type: 'sine' }],
     end: [523, 659, 784, 1047].map((f, i) => ({ at: i * 0.16, f, d: i === 3 ? 0.7 : 0.18 })),
   };
   const soundDur = (name) => Math.max(...NOTES[name].map((n) => n.at + n.d)) + 0.05;
@@ -284,7 +284,7 @@
     const n = Math.ceil((CLIP_LEAD + soundDur(name)) * rate);
     const buf = new Float32Array(n);
     for (const note of NOTES[name]) {
-      const peak = note.g || 0.9;
+      const peak = note.g || 1;
       const start = Math.floor((CLIP_LEAD + note.at) * rate);
       const len = Math.floor(note.d * rate);
       for (let i = 0; i < len && start + i < n; i++) {
@@ -292,7 +292,7 @@
         const env = t < 0.012 ? 0.0001 * Math.pow(peak / 0.0001, t / 0.012) : peak * Math.pow(0.0001 / peak, (t - 0.012) / (note.d - 0.012));
         const ph = 2 * Math.PI * note.f * t;
         const s = note.type === 'sine' ? Math.sin(ph) : (2 / Math.PI) * Math.asin(Math.sin(ph));
-        buf[start + i] += s * env * 0.9;
+        buf[start + i] += s * env;
       }
     }
     const view = new DataView(new ArrayBuffer(44 + n * 2));
@@ -777,7 +777,16 @@
     show('home');
 
     $('#btn-new').addEventListener('click', () => openEditor(null));
-    $('#btn-settings').addEventListener('click', () => { syncSettingsUI(); $('#settings').showModal(); });
+    const openSettings = () => { syncSettingsUI(); $('#settings').showModal(); };
+    $('#btn-settings').addEventListener('click', openSettings);
+    $('#run-settings').append($('#btn-settings svg').cloneNode(true));
+    $('#run-settings').addEventListener('click', openSettings);
+    // se si cambia modalità audio a allenamento in corso, riprogramma i suoni con quella nuova
+    $('#settings').addEventListener('close', () => {
+      if (run.state !== 'running') return;
+      ensureAudio();
+      resync();
+    });
 
     $('#ed-cancel').addEventListener('click', () => show('home'));
     $('#ed-form').addEventListener('input', updateTotal);
