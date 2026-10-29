@@ -1,8 +1,8 @@
 {
-  "name": "gym-timer",
+  "name": "thaimer",
   "version": "0.2.0",
   "private": true,
-  "description": "Gym Timer: PWA con timer a intervalli per allenamenti",
+  "description": "Thaimer: PWA con timer a intervalli per allenamenti",
   "scripts": {
     "test": "node tests/test_core.js && node tests/test_ui.js",
     "serve": "python3 -m http.server 8000 --directory public"

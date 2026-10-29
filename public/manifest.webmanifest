@@ -1,6 +1,6 @@
 {
-  "name": "Gym Timer",
-  "short_name": "Gym Timer",
+  "name": "Thaimer",
+  "short_name": "Thaimer",
   "description": "Timer a intervalli per allenamenti: HIIT, Tabata, circuiti, round di boxe.",
   "lang": "it",
   "start_url": "./",

@@ -1,4 +1,4 @@
-/* Gym Timer — logica pura (nessun accesso al DOM), testabile anche in Node. */
+/* Thaimer — logica pura (nessun accesso al DOM), testabile anche in Node. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.GymCore = factory();
