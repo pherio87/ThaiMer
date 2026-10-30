@@ -17,18 +17,18 @@
 </head>
 <body data-phase="idle">
 
-  <!-- HOME -->
+  <!-- HOME (Preferiti) -->
   <main id="home" class="view">
     <header class="bar">
       <h1><img src="icons/icon-192.png" alt="" width="40" height="40">Thaimer</h1>
       <div class="bar-actions">
-        <button class="icon-btn" id="btn-settings" aria-label="Impostazioni">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm8.4 4.5c.05-.33.1-.66.1-1s-.05-.67-.1-1l2-1.55a.5.5 0 0 0 .12-.64l-1.9-3.28a.5.5 0 0 0-.6-.22l-2.36.95a7.4 7.4 0 0 0-1.73-1l-.36-2.5A.5.5 0 0 0 14.1 2h-3.8a.5.5 0 0 0-.5.42l-.36 2.5c-.62.25-1.2.58-1.73 1l-2.36-.95a.5.5 0 0 0-.6.22L2.85 8.47a.5.5 0 0 0 .12.64l2 1.55c-.05.33-.1.66-.1 1s.05.67.1 1l-2 1.55a.5.5 0 0 0-.12.64l1.9 3.28c.13.22.4.3.6.22l2.36-.95c.53.42 1.11.75 1.73 1l.36 2.5c.04.24.25.42.5.42h3.8c.25 0 .46-.18.5-.42l.36-2.5c.62-.25 1.2-.58 1.73-1l2.36.95c.22.09.47 0 .6-.22l1.9-3.28a.5.5 0 0 0-.12-.64L20.4 13Z" fill="currentColor"/></svg>
+        <button class="icon-btn js-search" data-q="q-home" aria-label="Cerca">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" fill="currentColor"/></svg>
         </button>
-        <button class="btn" id="btn-models">Modelli</button>
-        <button class="btn primary" id="btn-new">+ Nuovo</button>
+        <button class="btn primary js-new">+ Nuovo</button>
       </div>
     </header>
+    <input type="search" id="q-home" class="search" placeholder="Cerca tra i preferiti" aria-label="Cerca tra i preferiti" hidden>
     <div id="list" class="list" aria-live="polite"></div>
     <p class="hint">Tocca un allenamento per avviarlo. Dal menu del browser scegli «Aggiungi a schermata Home» per installare l'app: funziona anche offline.</p>
   </main>
@@ -36,12 +36,25 @@
   <!-- MODELLI -->
   <section id="models" class="view" hidden>
     <header class="bar">
-      <h1>Modelli</h1>
-      <button class="btn ghost" id="models-back">Indietro</button>
+      <h1><img src="icons/icon-192.png" alt="" width="40" height="40">Thaimer</h1>
+      <div class="bar-actions">
+        <button class="icon-btn js-search" data-q="q-models" aria-label="Cerca">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" fill="currentColor"/></svg>
+        </button>
+        <button class="btn primary js-new">+ Nuovo</button>
+      </div>
     </header>
+    <input type="search" id="q-models" class="search" placeholder="Cerca tra i modelli" aria-label="Cerca tra i modelli" hidden>
     <div id="models-list"></div>
-    <p class="hint">Tocca un modello per avviarlo subito, oppure «Aggiungi» per metterlo tra i tuoi allenamenti e poterlo modificare.</p>
+    <p class="hint">Tocca un modello per avviarlo subito, oppure «Aggiungi» per metterlo nei Preferiti e poterlo modificare.</p>
   </section>
+
+  <!-- BARRA IN BASSO -->
+  <nav id="tabbar" class="tabbar" aria-label="Sezioni">
+    <button class="tab" id="tab-home" aria-current="page"><span class="pill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></span><span>Preferiti</span></button>
+    <button class="tab" id="tab-models"><span class="pill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/></svg></span><span>Modelli</span></button>
+    <button class="tab" id="btn-settings"><span class="pill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm8.4 4.5c.05-.33.1-.66.1-1s-.05-.67-.1-1l2-1.55a.5.5 0 0 0 .12-.64l-1.9-3.28a.5.5 0 0 0-.6-.22l-2.36.95a7.4 7.4 0 0 0-1.73-1l-.36-2.5A.5.5 0 0 0 14.1 2h-3.8a.5.5 0 0 0-.5.42l-.36 2.5c-.62.25-1.2.58-1.73 1l-2.36-.95a.5.5 0 0 0-.6.22L2.85 8.47a.5.5 0 0 0 .12.64l2 1.55c-.05.33-.1.66-.1 1s.05.67.1 1l-2 1.55a.5.5 0 0 0-.12.64l1.9 3.28c.13.22.4.3.6.22l2.36-.95c.53.42 1.11.75 1.73 1l.36 2.5c.04.24.25.42.5.42h3.8c.25 0 .46-.18.5-.42l.36-2.5c.62-.25 1.2-.58 1.73-1l2.36.95c.22.09.47 0 .6-.22l1.9-3.28a.5.5 0 0 0-.12-.64L20.4 13Z" fill="currentColor"/></svg></span><span>Impostazioni</span></button>
+  </nav>
 
   <!-- EDITOR -->
   <section id="editor" class="view" hidden>
