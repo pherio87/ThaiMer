@@ -48,13 +48,33 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* App nativa (Capacitor)                                              */
+  /* ------------------------------------------------------------------ */
+  // Nell'app Android la pagina gira in una WebView e parla con il plugin nativo «ThaimerNative»
+  // (android/app/src/main/java/it/thaimer/app): priorità audio, servizio in primo piano con notifica,
+  // schermo acceso. Sul web `available` è false e ogni chiamata non fa nulla.
+  const Native = (function () {
+    const C = window.Capacitor;
+    const available = !!(C && C.isNativePlatform && C.isNativePlatform() && C.nativePromise);
+    const call = (method, opts) => (available ? C.nativePromise('ThaimerNative', method, opts || {}).catch(() => null) : Promise.resolve(null));
+    const onAction = (cb) => {
+      if (available && C.nativeCallback) C.nativeCallback('ThaimerNative', 'addListener', { eventName: 'action' }, (d) => cb(d && d.action));
+    };
+    return { available, call, onAction };
+  })();
+  // Indirizzo pubblico del sito per i link di condivisione: nell'app nativa location.origin è https://localhost.
+  const SITE_URL = '';
+
+  /* ------------------------------------------------------------------ */
   /* Dati                                                                */
   /* ------------------------------------------------------------------ */
   const KEY_W = 'gymtimer.workouts.v1';
   const KEY_S = 'gymtimer.settings.v1';
-  const DEFAULTS = { volume: 1, countdown: 3, voice: true, extras: true, vibrate: true, wake: true, audioMode: 'mix' };
+  const DEFAULTS = { volume: 1, countdown: 3, voice: true, extras: true, vibrate: true, wake: true, audioMode: Native.available ? 'native' : 'mix', notifAsked: false };
 
   let S = Object.assign({}, DEFAULTS, loadJSON(KEY_S, {}));
+  // le modalità «native» e quelle sperimentali del browser esistono solo nei rispettivi ambienti
+  if (Native.available ? (S.audioMode !== 'mix' && S.audioMode !== 'native') : S.audioMode === 'native') S.audioMode = DEFAULTS.audioMode;
   let workouts = loadJSON(KEY_W, null);
 
   function seedPresets() {
@@ -184,11 +204,13 @@
   }
 
   function shareLink(w) {
-    return location.origin + location.pathname + '#w=' + Core.encodeShare(w);
+    const base = Native.available ? SITE_URL : location.origin + location.pathname;
+    return base ? base + '#w=' + Core.encodeShare(w) : '';
   }
 
   async function shareWorkout(w) {
     const url = shareLink(w);
+    if (!url) { toast('Condivisione non ancora disponibile in questa versione'); return; }
     try {
       if (navigator.share) {
         await navigator.share({ title: 'Thaimer: ' + w.name, text: 'Allenamento «' + w.name + '» per Thaimer', url });
@@ -317,12 +339,14 @@
     Object.keys(NOTES).forEach(clipFor);
   }
 
-  /* ---- finestra di abbassamento (modalità «clip» e «duck») ----
+  /* ---- finestra di abbassamento (modalità «clip», «duck» e «native») ----
      Una sola finestra continua: si apre DUCK_PAD prima di ogni suono e resta aperta finché c'è un suono
      in arrivo o la voce sta parlando; si chiude DUCK_PAD dopo l'ultimo. Così il conto alla rovescia 3-2-1
      e l'annuncio successivo tengono la musica bassa senza rialzarla tra un bip e l'altro.
      In «clip» la finestra è tenuta da un clip silenzioso di 1 s in loop (breve, come i bip, perché Android
-     lo tratti come priorità transitoria e abbassi la musica invece di fermarla). */
+     lo tratti come priorità transitoria e abbassi la musica invece di fermarla).
+     In «native» la finestra è del plugin Android (audio focus MAY_DUCK): i bip, programmati in anticipo, gli
+     arrivano con duckAt e li gestisce con i suoi timer; la voce, che parte a eventi, apre e chiude con duckSet. */
   const DUCK_PAD = 500;
   let duckOn = false;
   let duckUntil = 0;
@@ -335,6 +359,7 @@
     if (on === duckOn) return;
     duckOn = on;
     if (S.audioMode === 'duck') setSession(on ? 'transient' : 'ambient');
+    if (S.audioMode === 'native') Native.call('duckSet', { on });
     if (S.audioMode === 'clip') {
       if (on) {
         holdEl = new Audio();
@@ -358,6 +383,10 @@
   }
   // tiene la finestra aperta per holdMs, a partire da delayMs da adesso
   function duckHold(delayMs, holdMs) {
+    if (S.audioMode === 'native') {
+      Native.call('duckAt', { delayMs: Math.max(0, Math.round(delayMs)), holdMs: Math.round(holdMs) });
+      return;
+    }
     if (S.audioMode !== 'clip' && S.audioMode !== 'duck') return;
     timers.push(setTimeout(() => {
       duckUntil = Math.max(duckUntil, Date.now() + holdMs);
@@ -371,6 +400,7 @@
     speaking = null;
     speechUntil = 0;
     duckSet(false);
+    Native.call('duckCancel'); // finestre già programmate nel plugin
   }
 
   // delay = secondi da adesso al momento in cui il suono deve essere udibile
@@ -418,7 +448,7 @@
       if (v) u.voice = v;
       u.rate = 1.05;
       u.volume = Math.max(0.05, S.volume);
-      if (S.audioMode === 'duck' || S.audioMode === 'clip') {
+      if (S.audioMode === 'duck' || S.audioMode === 'clip' || S.audioMode === 'native') {
         // onend su Android a volte non arriva: la durata stimata dalla lunghezza del testo è il limite massimo
         u.onstart = () => { speaking = u; speechUntil = Date.now() + 1500 + text.length * 90; duckSet(true); duckCheck(); };
         const back = () => {
@@ -499,6 +529,7 @@
   /* ---- schermo sempre acceso ---- */
   let wakeLock = null;
   async function lockScreen() {
+    if (S.wake && Native.available) { Native.call('screenOn', { on: true }); return; }
     if (!S.wake || !('wakeLock' in navigator) || wakeLock) return;
     try {
       wakeLock = await navigator.wakeLock.request('screen');
@@ -506,6 +537,7 @@
     } catch (e) { wakeLock = null; }
   }
   function unlockScreen() {
+    if (Native.available) Native.call('screenOn', { on: false });
     if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
   }
 
@@ -513,8 +545,39 @@
   /* Allenamento in corso                                                */
   /* ------------------------------------------------------------------ */
   // pos = posizione nella timeline (ms). Quando è in corso: base + (Date.now() - t0).
-  const run = { w: null, tl: null, sounds: [], mcues: [], state: 'idle', pos: 0, base: 0, t0: 0, idx: 0, sIdx: 0, mIdx: 0, ticker: 0, endTimer: 0 };
+  const run = { w: null, tl: null, sounds: [], mcues: [], state: 'idle', pos: 0, base: 0, t0: 0, idx: 0, nIdx: -1, sIdx: 0, mIdx: 0, ticker: 0, endTimer: 0 };
   const PHASE_NAME = { prep: 'PREPARATI', warmup: 'RISCALDAMENTO', work: 'LAVORO', rest: 'RIPOSO', setrest: 'PAUSA SERIE', cool: 'DEFATICAMENTO' };
+
+  /* ---- servizio in primo piano (solo app Android) ----
+     Tiene vivo il processo e mostra la notifica con Pausa/Termina finché l'allenamento è aperto. */
+  let nativeSvc = false;
+  function nativeRunState() {
+    if (!Native.available || !run.w) return;
+    const g = run.tl.segs[Math.min(Core.segIndexAt(run.tl, curPos()), run.tl.segs.length - 1)];
+    const text = run.state === 'paused' ? 'In pausa' : run.state === 'done' ? 'Completato'
+      : PHASE_NAME[g.type] + (g.type === 'work' && g.ex ? ' · ' + g.ex : '');
+    const opts = { title: run.w.name, text, paused: run.state === 'paused' };
+    if (nativeSvc) {
+      Native.call('serviceUpdate', opts);
+    } else {
+      nativeSvc = true;
+      Native.call('serviceStart', opts).then((r) => { if (r === null) nativeSvc = false; });
+    }
+  }
+  function nativeRunBegin() {
+    if (!Native.available) return;
+    // il permesso per la notifica si chiede una volta sola, al primo allenamento
+    if (!S.notifAsked) {
+      S.notifAsked = true;
+      saveSettings();
+      Native.call('requestNotifications').then(nativeRunState);
+    } else nativeRunState();
+  }
+  function nativeRunEnd() {
+    if (!Native.available) return;
+    nativeSvc = false;
+    Native.call('serviceStop');
+  }
 
   function curPos() {
     return run.state === 'running' ? Math.min(run.tl.total, run.base + (Date.now() - run.t0)) : run.pos;
@@ -576,6 +639,7 @@
       if (c.vib) vibrate(c.vib);
     }
     while (run.idx < run.tl.segs.length - 1 && pos >= run.tl.segs[run.idx].end) run.idx++;
+    if (run.idx !== run.nIdx) { run.nIdx = run.idx; nativeRunState(); }
     if (pos >= run.tl.total) { finish(); return; }
     render(pos);
     schedule();
@@ -591,6 +655,8 @@
     run.base = run.pos;
     run.t0 = Date.now();
     reindex(run.pos);
+    run.nIdx = run.idx;
+    nativeRunBegin();
     startTicker();
     tick();
   }
@@ -602,6 +668,7 @@
     cancelScheduled();
     if ('speechSynthesis' in window) speechSynthesis.cancel();
     keepAlivePause();
+    nativeRunState();
     render(run.pos);
   }
 
@@ -616,6 +683,8 @@
     run.base = run.pos;
     run.t0 = Date.now();
     reindex(run.pos);
+    run.nIdx = run.idx;
+    nativeRunState();
     tick();
   }
 
@@ -648,6 +717,7 @@
     clearInterval(run.ticker);
     run.pos = run.tl.total;
     run.state = 'done';
+    nativeRunState();
     render(run.pos);
     // lascia suonare la fanfara finale, poi libera schermo e audio
     clearTimeout(run.endTimer);
@@ -655,6 +725,7 @@
       unlockScreen();
       keepAliveStop();
       setSession('auto');
+      nativeRunEnd();
     }, 4500);
   }
 
@@ -666,6 +737,7 @@
     unlockScreen();
     keepAliveStop();
     setSession('auto');
+    nativeRunEnd();
     run.state = 'idle';
     show('home');
   }
@@ -778,6 +850,14 @@
   /* Collegamenti                                                        */
   /* ------------------------------------------------------------------ */
   function init() {
+    // «Affiancato» c'è sempre; «Abbassa la musica» solo nell'app, le modalità sperimentali solo nel browser
+    for (const el of document.querySelectorAll('.mode[data-only]')) el.hidden = (el.dataset.only === 'native') !== Native.available;
+    if (Native.available) $('#home .hint').hidden = true;
+    Native.onAction((a) => {
+      if (a === 'pause') pause();
+      else if (a === 'resume') resume();
+      else if (a === 'stop' && run.state !== 'idle') stopRun();
+    });
     buildEditorFields();
     syncSettingsUI();
     bindSettings();
@@ -846,7 +926,8 @@
     window.addEventListener('hashchange', checkIncomingShare);
     checkIncomingShare();
 
-    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    // nell'app i file sono già dentro l'APK: il service worker servirebbe solo una copia vecchia dopo un aggiornamento
+    if (!Native.available && 'serviceWorker' in navigator && location.protocol !== 'file:') {
       navigator.serviceWorker.register('sw.js').catch(() => {});
     }
   }
