@@ -34,6 +34,12 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      VERSION_CODE: ${{ github.run_number }}
+      HAS_KEY: ${{ secrets.KEYSTORE_B64 != '' }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -58,12 +64,31 @@ jobs:
       - name: Copia la web nel progetto Android
         run: npx cap sync android
 
+      # senza i segreti la compilazione resta quella di prima (chiave di debug)
+      - name: Chiave di firma
+        if: env.HAS_KEY == 'true'
+        run: |
+          echo "${{ secrets.KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/thaimer.jks"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/thaimer.jks" >> "$GITHUB_ENV"
+
       - name: Compila l'APK di prova
         working-directory: android
         run: ./gradlew assembleDebug --stacktrace
+
+      - name: Compila il bundle per il Play Store
+        if: env.HAS_KEY == 'true'
+        working-directory: android
+        run: ./gradlew bundleRelease --stacktrace
 
       - uses: actions/upload-artifact@v4
         with:
           name: thaimer-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: env.HAS_KEY == 'true'
+        with:
+          name: thaimer-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
