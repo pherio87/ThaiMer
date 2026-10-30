@@ -7,7 +7,8 @@ android {
         applicationId "thaimer.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        // la CI passa il numero dell'esecuzione: il Play Store vuole un versionCode sempre crescente
+        versionCode (System.getenv('VERSION_CODE') ?: '1') as int
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
@@ -16,8 +17,23 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Firma: la CI passa la chiave dai segreti di GitHub (KEYSTORE_FILE ecc.). Senza, resta la chiave di debug.
+    def hasKey = System.getenv('KEYSTORE_FILE') != null
+    if (hasKey) {
+        signingConfigs {
+            thaimer {
+                storeFile file(System.getenv('KEYSTORE_FILE'))
+                storePassword System.getenv('KEYSTORE_PASSWORD')
+                keyAlias System.getenv('KEY_ALIAS')
+                keyPassword System.getenv('KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
+        // anche l'APK di prova con la chiave vera: si aggiorna sopra il precedente senza disinstallare
+        if (hasKey) debug { signingConfig signingConfigs.thaimer }
         release {
+            if (hasKey) signingConfig signingConfigs.thaimer
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
