@@ -212,3 +212,4 @@ dialog::backdrop { background: rgba(0,0,0,.65); }
 .tab[aria-current="page"] .pill { background: var(--accent); color: var(--accent-ink); }
 body.has-tabs .view { padding-bottom: calc(var(--safe-b) + 104px); }
 body.has-tabs #toast { bottom: calc(var(--safe-b) + 96px); }
+.btn[disabled] { opacity: .6; cursor: default; }

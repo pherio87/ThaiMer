@@ -239,15 +239,6 @@
     }
   }
 
-  const PRESETS = [
-    { color: 1, name: 'Tabata', prepare: 10, warmup: 0, work: 20, rest: 10, rounds: 8, sets: 1, setRest: 0, cooldown: 0, exercises: [] },
-    { color: 2, name: 'HIIT 30/30', prepare: 10, warmup: 60, work: 30, rest: 30, rounds: 10, sets: 1, setRest: 0, cooldown: 60, exercises: [] },
-    { color: 5, name: 'Circuito 6 esercizi', prepare: 10, warmup: 120, work: 40, rest: 20, rounds: 6, sets: 3, setRest: 60, cooldown: 120, exercises: ['Squat', 'Push-up', 'Affondi', 'Plank', 'Burpee', 'Mountain climber'] },
-    { color: 0, name: 'Round di boxe', prepare: 10, warmup: 0, work: 180, rest: 60, rounds: 6, sets: 1, setRest: 0, cooldown: 0, exercises: [] },
-    { color: 3, name: 'EMOM 12 minuti', prepare: 10, warmup: 0, work: 45, rest: 15, rounds: 12, sets: 1, setRest: 0, cooldown: 0, exercises: [] },
-    { color: 4, name: 'Stretching', prepare: 10, warmup: 0, work: 30, rest: 5, rounds: 10, sets: 1, setRest: 0, cooldown: 0, exercises: [] },
-  ];
-
   // Catalogo «Modelli»: non finisce nella lista dell'utente finché non preme «Aggiungi» (o lo avvia al volo).
   // color = indice nella tavolozza del brand (--c0…--c5 in style.css).
   const M = (color, name, o) => Object.assign({ color, name, prepare: 10, warmup: 0, rest: 0, rounds: 1, sets: 1, setRest: 0, cooldown: 0, exercises: [] }, o);
@@ -296,6 +287,9 @@
       M(2, 'Flow mattutino', { work: 40, rest: 10, rounds: 6, exercises: ['Cat-cow', 'Cane a testa in giù', 'Guerriero', 'Torsione seduta', 'Ponte', 'Respiro profondo'] }),
     ] },
   ];
+
+  // Gli allenamenti con cui parte la lista dei Preferiti (e che «Ripristina esempi» rimette): tre modelli del catalogo.
+  const PRESETS = ['Tabata', 'Total body', 'Round 60/30'].map((n) => MODELS.flatMap((c) => c.items).find((m) => m.name === n));
 
   return { LIMITS, sanitizeWorkout, buildTimeline, buildCues, firstIdx, segIndexAt, fmt, fmtShort, summary, encodeShare, decodeShare, newId, PRESETS, MODELS };
 });

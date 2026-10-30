@@ -7,6 +7,8 @@ const t = (name, fn) => { fn(); passed++; console.log('ok  -', name); };
 
 const tabata = Core.sanitizeWorkout({ name: 'Tabata', prepare: 10, warmup: 0, work: 20, rest: 10, rounds: 8, sets: 1, setRest: 0, cooldown: 0, exercises: [] });
 
+const circuito6 = { name: 'Circuito 6 esercizi', prepare: 10, warmup: 120, work: 40, rest: 20, rounds: 6, sets: 3, setRest: 60, cooldown: 120, exercises: ['Squat', 'Push-up', 'Affondi', 'Plank', 'Burpee', 'Mountain climber'] };
+
 t('Tabata: durata totale = 10 + 8*20 + 7*10 = 240 s', () => {
   const tl = Core.buildTimeline(tabata);
   assert.strictEqual(tl.total, 240000);
@@ -15,14 +17,14 @@ t('Tabata: durata totale = 10 + 8*20 + 7*10 = 240 s', () => {
 });
 
 t('le fasi sono contigue e senza buchi', () => {
-  const tl = Core.buildTimeline(Core.sanitizeWorkout(Core.PRESETS[2]));
+  const tl = Core.buildTimeline(Core.sanitizeWorkout(circuito6));
   let prev = 0;
   for (const g of tl.segs) { assert.strictEqual(g.start, prev); assert.strictEqual(g.end, g.start + g.dur); prev = g.end; }
   assert.strictEqual(prev, tl.total);
 });
 
 t('circuito 3 serie: pausa tra serie solo tra le serie (2), esercizi a rotazione', () => {
-  const w = Core.sanitizeWorkout(Core.PRESETS[2]);
+  const w = Core.sanitizeWorkout(circuito6);
   const tl = Core.buildTimeline(w);
   assert.strictEqual(tl.segs.filter(g => g.type === 'setrest').length, 2);
   const works = tl.segs.filter(g => g.type === 'work');
@@ -142,6 +144,7 @@ t('condivisione: input non valido o malevolo → null', () => {
 });
 
 t('tutti i preset sono validi e la durata è sensata', () => {
+  assert.deepStrictEqual(Core.PRESETS.map((p) => p.name), ['Tabata', 'Total body', 'Round 60/30']);
   for (const p of Core.PRESETS) {
     const w = Core.sanitizeWorkout(p);
     const tl = Core.buildTimeline(w);

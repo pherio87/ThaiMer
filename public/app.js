@@ -161,6 +161,7 @@
       for (const m of items) {
         const w = Core.sanitizeWorkout(m, false);
         const tl = Core.buildTimeline(w);
+        const inFav = workouts.some((x) => x.name === w.name);
         list.append(
           h('article', { class: 'card', 'data-c': w.color },
             h('button', { class: 'card-main', onclick: () => openRun(w), 'aria-label': 'Avvia ' + w.name },
@@ -168,7 +169,10 @@
               h('span', { class: 'meta' }, Core.summary(w))),
             h('div', { class: 'card-side' },
               h('span', { class: 'dur' }, tl.loop ? '∞' : Core.fmt(tl.total)),
-              h('button', { class: 'btn ghost', onclick: () => { workouts.push(Core.sanitizeWorkout(m, false)); saveWorkouts(); renderHome(); toast('«' + w.name + '» aggiunto ai preferiti'); } }, 'Aggiungi')))
+              h('button', {
+                class: 'btn ghost', disabled: inFav, 'aria-label': (inFav ? 'Già nei preferiti: ' : 'Aggiungi ai preferiti: ') + w.name,
+                onclick: () => { workouts.push(Core.sanitizeWorkout(m, false)); saveWorkouts(); renderHome(); renderModels(); toast('«' + w.name + '» aggiunto ai preferiti'); },
+              }, inFav ? '♥ Nei preferiti' : '♡ Aggiungi')))
         );
       }
       box.append(h('h2', { class: 'cat' }, cat.cat), list);
