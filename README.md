@@ -30,6 +30,26 @@ I nomi dei pulsanti di Cloudflare possono cambiare nel tempo.
 - Android (Chrome): menu ⋮ → «Installa app».
 - iPhone (Safari): Condividi → «Aggiungi alla schermata Home».
 
+## App Android (Capacitor)
+La stessa app dentro un guscio Android, per ottenere la priorità audio nativa (la musica si abbassa invece di sovrapporsi), un servizio in primo piano con notifica (Pausa/Termina) e lo schermo sempre acceso.
+
+**Senza installare nulla: l'APK dalla CI**
+1. Su GitHub apri **Actions → APK Android** e l'ultima esecuzione riuscita (o avviala con **Run workflow**).
+2. In fondo alla pagina scarica l'allegato `thaimer-debug-apk` (uno zip con `app-debug.apk`).
+3. Copialo sul telefono e aprilo; Android chiede di consentire l'installazione da fonti sconosciute.
+4. Ogni APK della CI ha una firma di debug diversa: per installarne uno nuovo disinstalla prima il vecchio.
+
+**In locale con Android Studio**
+```
+npm install
+npm run android:sync     # copia public/ nel progetto Android
+npm run android:open     # apre Android Studio: Run ▶ su telefono o emulatore
+```
+
+**Prova con Spotify**: avvia la musica, apri Thaimer (Impostazioni → «Abbassa la musica» è già attiva), premi «Prova suono e voce», poi lancia un Tabata e passa a Spotify. Controlla che la musica si abbassi sui bip e sulla voce e poi risalga, che non vada in pausa, che l'allenamento prosegua a schermo spento e che i pulsanti della notifica funzionino.
+
+Prima della pubblicazione sul Play Store restano da fare: dominio per i link di condivisione (`SITE_URL` in `public/app.js`), apertura dei link `#w=…` direttamente nell'app, firma di rilascio, scheda dello store.
+
 ## Prova dell'audio con la musica
 Impostazioni → «Audio e musica di altre app». Per ogni modalità: avvia la musica, torna all'app, premi «Prova suono e voce», poi lancia un Tabata passando all'app della musica e tornando.
 

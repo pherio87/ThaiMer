@@ -12,12 +12,18 @@ const appSrc = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
 
 let passed = 0;
 let blobCount = 0;
-const t = (name, fn) => { fn(); passed++; console.log('ok  -', name); };
+const pending = []; // test che restituiscono una Promise: si attendono tutti prima del riepilogo
+const t = (name, fn) => {
+  const r = fn();
+  const done = () => { passed++; console.log('ok  -', name); };
+  if (r && typeof r.then === 'function') pending.push(r.then(done));
+  else done();
+};
 
 function boot(opts = {}) {
   // ---- orologio finto ----
   const clock = { now: 1_700_000_000_000, timers: new Map(), nextId: 1 };
-  const rec = { beeps: [], spoken: [], vibes: [], session: [], toasts: [], played: 0, plays: [], pauses: [], utts: [], loads: [] };
+  const rec = { beeps: [], spoken: [], vibes: [], session: [], toasts: [], played: 0, plays: [], pauses: [], utts: [], loads: [], native: [], listeners: [], swRegs: 0, shares: [] };
 
   const dom = new JSDOM(html, {
     url: 'https://gym.example/' + (opts.hash || ''),
@@ -41,6 +47,16 @@ function boot(opts = {}) {
       };
       w.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
       w.speechSynthesis = { speak: (u) => { rec.spoken.push(u.text); rec.utts.push(u); }, cancel() {}, getVoices: () => [] };
+      // app Android: il bridge di Capacitor che l'APK inietta nella pagina, con il plugin ThaimerNative registrato
+      if (opts.native) {
+        w.Capacitor = {
+          isNativePlatform: () => true,
+          nativePromise: (plugin, method, o) => { rec.native.push({ plugin, method, o, at: clock.now }); return Promise.resolve({}); },
+          nativeCallback: (plugin, method, o, cb) => { rec.listeners.push({ plugin, method, o, cb }); },
+        };
+      }
+      Object.defineProperty(w.navigator, 'serviceWorker', { value: { register: () => { rec.swRegs++; return Promise.resolve(); } } });
+      Object.defineProperty(w.navigator, 'share', { value: (d) => { rec.shares.push(d); return Promise.resolve(); } });
       Object.defineProperty(w.navigator, 'vibrate', { value: (p) => { rec.vibes.push(p); return true; } });
       Object.defineProperty(w.navigator, 'audioSession', { value: { set type(v) { rec.session.push(v); } } });
       w.HTMLMediaElement.prototype.play = function () { rec.played++; rec.plays.push({ src: this.src, at: clock.now, loop: this.loop }); return Promise.resolve(); };
@@ -365,4 +381,199 @@ t('impostazioni: le modifiche vengono salvate', () => {
   assert.strictEqual(saved.audioMode, 'duck');
 });
 
-console.log('\n' + passed + ' test UI superati');
+
+/* ---------------------------------------------------------------------------
+   App Android (Capacitor): plugin nativo per priorità audio, servizio e schermo
+   --------------------------------------------------------------------------- */
+const calls = (rec, method) => rec.native.filter((c) => c.method === method);
+const startTabata = (q) => {
+  [...q('#list').querySelectorAll('.card-main')].find((b) => b.textContent.includes('Tabata')).click();
+  q('#run-toggle').click();
+};
+
+t('app: modalità audio «Abbassa la musica» predefinita, solo «Affiancato» e quella nativa nelle impostazioni', () => {
+  const { q, w } = boot({ native: true });
+  const visible = [...w.document.querySelectorAll('input[name="audioMode"]')].filter((r) => !r.closest('.mode').hidden).map((r) => r.value);
+  assert.deepStrictEqual(visible, ['mix', 'native']);
+  assert.strictEqual(w.document.querySelector('input[name="audioMode"][value="native"]').checked, true);
+  assert.strictEqual(q('#home .hint').hidden, true, 'niente istruzioni di installazione nell\'app');
+});
+
+t('web: la modalità nativa non compare e le chiamate al plugin non partono', () => {
+  const { q, w, advance, rec } = boot();
+  const visible = [...w.document.querySelectorAll('input[name="audioMode"]')].filter((r) => !r.closest('.mode').hidden).map((r) => r.value);
+  assert.deepStrictEqual(visible, ['mix', 'clip', 'duck', 'bg']);
+  startTabata(q);
+  advance(12_000);
+  assert.strictEqual(rec.native.length, 0);
+  assert.strictEqual(rec.swRegs, 1, 'sul web il service worker si registra');
+});
+
+t('app: un modo salvato che non esiste nell\'app (clip) torna al predefinito; nel web «native» torna a «mix»', () => {
+  const a = boot({ native: true, settings: { audioMode: 'clip' } });
+  assert.strictEqual(a.w.document.querySelector('input[name="audioMode"][value="native"]').checked, true);
+  const b = boot({ settings: { audioMode: 'native' } });
+  assert.strictEqual(b.w.document.querySelector('input[name="audioMode"][value="mix"]').checked, true);
+});
+
+t('app: nessun service worker; i suoni restano in Web Audio programmati in anticipo', () => {
+  const { q, advance, rec } = boot({ native: true });
+  assert.strictEqual(rec.swRegs, 0);
+  startTabata(q);
+  advance(100);
+  assert.strictEqual(rec.plays.filter((p) => !p.loop).length, 0, 'nessuna clip <audio>');
+  const times = rec.beeps.map((b) => Math.round(b.when * 100) / 100);
+  assert.ok(times.some((x) => Math.abs(x - 7) < 0.02) && times.some((x) => Math.abs(x - 10) < 0.02), 'beep già programmati: ' + times.slice(0, 8).join(','));
+  assert.ok(times.some((x) => x > 60), 'anticipo ampio (90 s), non i 4 s delle clip');
+});
+
+t('app: ogni suono apre una finestra di priorità audio nel plugin, da 0,5 s prima', () => {
+  const { q, advance, rec } = boot({ native: true });
+  startTabata(q);
+  advance(100);
+  const at = calls(rec, 'duckAt').map((c) => c.o);
+  // tick a 7, 8, 9 s e «via» a 10 s: il primo si apre a 7 - 0,5 = 6,5 s da adesso (circa)
+  assert.ok(at.length >= 4, 'una finestra per suono: ' + JSON.stringify(at.slice(0, 4)));
+  assert.ok(at.some((o) => Math.abs(o.delayMs - 6400) <= 150), 'apertura a ~6,4 s: ' + at.slice(0, 4).map((o) => o.delayMs).join(','));
+  assert.ok(at.every((o) => Number.isInteger(o.delayMs) && o.delayMs >= 0 && o.holdMs >= 1000), 'millisecondi interi, finestra ≥ 1 s');
+  assert.ok(rec.session.indexOf('transient') < 0, 'non usa audioSession');
+});
+
+t('app: la voce apre e chiude la priorità audio; se non segnala la fine la finestra si chiude lo stesso', () => {
+  const { q, advance, rec } = boot({ native: true });
+  startTabata(q);
+  advance(200);
+  const utt = rec.utts[rec.utts.length - 1];
+  utt.onstart();
+  assert.deepStrictEqual(calls(rec, 'duckSet').map((c) => c.o.on), [true]);
+  utt.onend();
+  advance(1000);
+  assert.deepStrictEqual(calls(rec, 'duckSet').map((c) => c.o.on), [true, false]);
+  // senza onend: scade da sola
+  advance(300);
+  const rec2 = boot({ native: true });
+  startTabata(rec2.q);
+  rec2.advance(200);
+  rec2.rec.utts[rec2.rec.utts.length - 1].onstart();
+  rec2.advance(20_000);
+  assert.deepStrictEqual(calls(rec2.rec, 'duckSet').map((c) => c.o.on), [true, false]);
+});
+
+t('app: pausa e salto annullano le finestre già programmate', () => {
+  const { q, advance, rec } = boot({ native: true });
+  startTabata(q);
+  advance(2000);
+  const before = calls(rec, 'duckCancel').length;
+  q('#run-toggle').click(); // pausa
+  assert.ok(calls(rec, 'duckCancel').length > before, 'pausa: finestre annullate');
+  q('#run-toggle').click(); // riprende: ripianifica
+  const opened = calls(rec, 'duckAt').length;
+  advance(100);
+  assert.ok(calls(rec, 'duckAt').length >= opened);
+  const c2 = calls(rec, 'duckCancel').length;
+  q('#run-next-btn').click();
+  assert.ok(calls(rec, 'duckCancel').length > c2, 'salto: finestre annullate');
+});
+
+t('app: modalità «Affiancato» non apre finestre di priorità audio', () => {
+  const { q, advance, rec } = boot({ native: true, settings: { audioMode: 'mix' } });
+  startTabata(q);
+  advance(12_000);
+  rec.utts[rec.utts.length - 1].onstart && rec.utts[rec.utts.length - 1].onstart();
+  assert.strictEqual(calls(rec, 'duckAt').length, 0);
+  assert.strictEqual(calls(rec, 'duckSet').length, 0);
+  assert.ok(rec.beeps.length > 0, 'i suoni suonano comunque');
+});
+
+t('app: servizio in primo piano e schermo acceso per tutto l\'allenamento', () => {
+  const { q, advance, rec } = boot({ native: true });
+  [...q('#list').querySelectorAll('.card-main')].find((b) => b.textContent.includes('Tabata')).click();
+  assert.strictEqual(rec.native.length, 0, 'nulla finché non si preme avvio');
+  q('#run-toggle').click();
+  advance(100);
+  assert.strictEqual(calls(rec, 'requestNotifications').length, 1, 'permesso notifiche chiesto al primo avvio');
+  return Promise.resolve().then(() => Promise.resolve()).then(() => {
+    const start = calls(rec, 'serviceStart');
+    assert.strictEqual(start.length, 1);
+    assert.ok(start[0].o.title.includes('Tabata') && start[0].o.text === 'PREPARATI' && start[0].o.paused === false, JSON.stringify(start[0].o));
+    assert.ok(calls(rec, 'screenOn').some((c) => c.o.on === true));
+    advance(10_200);
+    assert.strictEqual(calls(rec, 'serviceUpdate').pop().o.text.startsWith('LAVORO'), true, 'la notifica segue la fase');
+    q('#run-toggle').click();
+    const u = calls(rec, 'serviceUpdate').pop().o;
+    assert.deepStrictEqual([u.text, u.paused], ['In pausa', true]);
+    q('#run-toggle').click();
+    assert.strictEqual(calls(rec, 'serviceUpdate').pop().o.paused, false);
+    assert.strictEqual(calls(rec, 'serviceStart').length, 1, 'il servizio non viene riavviato');
+    q('#run-close').click();
+    assert.strictEqual(calls(rec, 'serviceStop').length, 1);
+    assert.strictEqual(calls(rec, 'screenOn').pop().o.on, false);
+  });
+});
+
+t('app: il permesso per le notifiche si chiede una volta sola', () => {
+  const { q, advance, rec, w } = boot({ native: true });
+  startTabata(q);
+  advance(100);
+  q('#run-close').click();
+  startTabata(q);
+  advance(100);
+  assert.strictEqual(calls(rec, 'requestNotifications').length, 1);
+  assert.strictEqual(JSON.parse(w.localStorage.getItem('gymtimer.settings.v1')).notifAsked, true);
+  const again = boot({ native: true, settings: { notifAsked: true } });
+  startTabata(again.q);
+  again.advance(100);
+  assert.strictEqual(calls(again.rec, 'requestNotifications').length, 0);
+});
+
+t('app: i pulsanti della notifica mettono in pausa, riprendono e terminano', () => {
+  const { q, advance, rec } = boot({ native: true });
+  const l = rec.listeners.find((x) => x.method === 'addListener' && x.o.eventName === 'action');
+  assert.ok(l, 'ascolta gli eventi del plugin');
+  startTabata(q);
+  advance(2000);
+  l.cb({ action: 'pause' });
+  assert.strictEqual(q('#run-toggle').getAttribute('aria-label'), 'Riprendi');
+  l.cb({ action: 'resume' });
+  assert.strictEqual(q('#run-toggle').getAttribute('aria-label'), 'Pausa');
+  l.cb({ action: 'stop' });
+  assert.strictEqual(q('#home').hidden, false);
+  assert.strictEqual(calls(rec, 'serviceStop').length, 1);
+  l.cb({ action: 'stop' }); // a allenamento chiuso non succede nulla
+  l.cb(undefined);
+});
+
+t('app: fine allenamento, il servizio si ferma dopo la fanfara', () => {
+  const { q, advance, rec } = boot({ native: true });
+  startTabata(q);
+  advance(1000);
+  q('#run-next-btn').click(); // salta la preparazione: restano 230 s
+  advance(231_000);
+  assert.strictEqual(q('#run-phase').textContent, 'COMPLETATO');
+  assert.strictEqual(calls(rec, 'serviceUpdate').pop().o.text, 'Completato');
+  assert.strictEqual(calls(rec, 'serviceStop').length, 0, 'ancora attivo durante la fanfara');
+  advance(5000);
+  assert.strictEqual(calls(rec, 'serviceStop').length, 1);
+});
+
+t('app: la condivisione non produce link https://localhost; sul web usa l\'indirizzo della pagina', () => {
+  const a = boot({ native: true });
+  a.q('#list .card-main').click(); // apre l'allenamento: servono l'editor e il pulsante condividi
+  a.q('#run-close').click();
+  a.q('#list .card .btn.ghost').click();
+  a.q('#ed-share').click();
+  assert.strictEqual(a.rec.shares.length, 0, 'nessun link inviato');
+  assert.ok(a.q('#toast').textContent.includes('non ancora disponibile'));
+  const b = boot();
+  b.q('#list .card .btn.ghost').click();
+  b.q('#ed-share').click();
+  return Promise.resolve().then(() => {
+    assert.strictEqual(b.rec.shares.length, 1);
+    assert.ok(b.rec.shares[0].url.startsWith('https://gym.example/#w='), b.rec.shares[0].url);
+  });
+});
+
+Promise.all(pending).then(
+  () => console.log('\n' + passed + ' test UI superati'),
+  (e) => { console.error(e); process.exit(1); }
+);
