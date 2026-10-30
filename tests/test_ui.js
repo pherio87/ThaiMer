@@ -337,11 +337,14 @@ t('impostazioni: si aprono anche durante l\'allenamento, che continua', () => {
   advance(2000);
   assert.ok(q('#run-settings svg'), 'icona presente');
   q('#run-settings').click();
-  assert.ok(q('#settings').hasAttribute('open'));
+  assert.strictEqual(q('#settings').hidden, false, 'pagina intera');
+  assert.strictEqual(q('#run').hidden, true);
+  assert.strictEqual(q('#tabbar').hidden, true, 'in allenamento niente barra in basso');
   q('#set-volume').value = '0.5';
   q('#set-volume').dispatchEvent(new w.Event('input'));
-  q('#settings').removeAttribute('open');
-  q('#settings').dispatchEvent(new w.Event('close'));
+  q('#set-save').click();
+  assert.strictEqual(q('#run').hidden, false, 'Salva riporta all\'allenamento');
+  assert.strictEqual(q('#settings').hidden, true);
   advance(10_000);
   assert.strictEqual(q('#run-phase').textContent, 'LAVORO', 'il timer non si è fermato');
 });
@@ -659,8 +662,15 @@ t('barra in basso: Preferiti, Modelli, Impostazioni; in alto solo cerca e nuovo;
   q('#tab-models').click();
   assert.deepStrictEqual(cur(), ['tab-models']);
   q('#btn-settings').click();
-  assert.ok(q('#settings').hasAttribute('open'));
-  assert.deepStrictEqual(cur(), ['tab-models'], 'le impostazioni non cambiano la schermata');
+  assert.strictEqual(q('#settings').hidden, false, 'Impostazioni è una pagina intera');
+  assert.strictEqual(q('#models').hidden, true);
+  assert.deepStrictEqual(cur(), ['btn-settings']);
+  assert.strictEqual(q('#tabbar').hidden, false);
+  assert.strictEqual(q('#set-save').textContent, 'Salva');
+  q('#set-save').click();
+  assert.strictEqual(q('#home').hidden, false, 'Salva porta ai Preferiti');
+  assert.deepStrictEqual(cur(), ['tab-home']);
+  q('#tab-models').click();
   q('#tab-home').click();
   assert.deepStrictEqual(cur(), ['tab-home']);
   q('.js-new').click();
@@ -717,6 +727,46 @@ t('cerca: filtra Preferiti e Modelli per nome', () => {
   mi.dispatchEvent(new w.Event('input'));
   assert.ok([...w.document.querySelectorAll('#models-list .card strong')].some((e) => e.textContent === 'Muay thai'));
   assert.deepStrictEqual([...w.document.querySelectorAll('#models-list .cat')].map((e) => e.textContent), ['Muay Thai e Boxe']);
+});
+
+t('indietro dalle Impostazioni: torna ai Preferiti (o all\'allenamento); app: il tasto del telefono fa lo stesso e dai Preferiti chiude', () => {
+  const { q, w, advance, rec } = boot({ native: true });
+  const l = rec.listeners.find((x) => x.plugin === 'App' && x.o.eventName === 'backButton');
+  assert.ok(l, 'ascolta il tasto indietro del telefono');
+  const exits = () => rec.native.filter((c) => c.plugin === 'App' && c.method === 'exitApp').length;
+  q('#btn-settings').click();
+  assert.strictEqual(q('#settings').hidden, false);
+  l.cb();
+  assert.strictEqual(q('#home').hidden, false, 'dalle Impostazioni ai Preferiti');
+  assert.strictEqual(exits(), 0);
+  q('#tab-models').click();
+  l.cb();
+  assert.strictEqual(q('#home').hidden, false, 'da Modelli ai Preferiti');
+  assert.strictEqual(exits(), 0);
+  l.cb();
+  assert.strictEqual(exits(), 1, 'dai Preferiti chiude l\'app');
+  // dalle Impostazioni aperte in allenamento si torna all'allenamento, che continua
+  startTabata(q);
+  advance(500);
+  q('#run-settings').click();
+  l.cb();
+  assert.strictEqual(q('#run').hidden, false);
+  assert.strictEqual(q('#run-phase').textContent, 'PREPARATI');
+  w.confirm = () => false;
+  l.cb();
+  assert.strictEqual(q('#run').hidden, false, 'senza conferma resta');
+  w.confirm = () => true;
+  l.cb();
+  assert.strictEqual(q('#home').hidden, false);
+  assert.strictEqual(exits(), 1);
+});
+
+t('web: il tasto indietro del browser dalle Impostazioni torna ai Preferiti', () => {
+  const { q, w } = boot();
+  q('#btn-settings').click();
+  w.dispatchEvent(new w.PopStateEvent('popstate'));
+  assert.strictEqual(q('#home').hidden, false);
+  assert.strictEqual(q('#settings').hidden, true);
 });
 
 Promise.all(pending).then(
