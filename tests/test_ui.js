@@ -469,8 +469,16 @@ t('app: voce spenta, nessun annuncio; volume e avvertimento se il telefono non h
   startTabata(b.q);
   b.advance(200);
   assert.strictEqual(calls(b.rec, 'speak')[0].o.volume, 0.4);
+  const c = boot({ native: true });
+  c.w.Capacitor.nativePromise = (plugin, method, o) => {
+    c.rec.native.push({ plugin, method, o });
+    return Promise.resolve(method === 'speak' ? { ok: true, lang: false } : {});
+  };
+  startTabata(c.q);
+  c.advance(200);
   return Promise.resolve().then(() => Promise.resolve()).then(() => {
-    assert.ok(b.q('#toast').textContent.includes('Voce non disponibile'), b.q('#toast').textContent);
+    assert.ok(b.q('#toast').textContent.includes('Voce non disponibile (errore)'), b.q('#toast').textContent);
+    assert.ok(c.q('#toast').textContent.includes('Voce italiana non installata'), c.q('#toast').textContent);
   });
 });
 

@@ -443,7 +443,9 @@
     if (Native.available) {
       if (!S.voice || !text) return;
       Native.call('speak', { text, volume: Math.max(0.05, S.volume), duck: S.audioMode === 'native' }).then((r) => {
-        if (r && r.ok === false && !voiceWarned) { voiceWarned = true; toast('Voce non disponibile: sul telefono manca un motore di sintesi vocale'); }
+        if (!r || voiceWarned) return;
+        if (r.ok === false) { voiceWarned = true; toast('Voce non disponibile (' + (r.reason || 'errore') + '): controlla il motore di sintesi vocale del telefono'); }
+        else if (r.lang === false) { voiceWarned = true; toast('Voce italiana non installata sul telefono: uso quella di sistema'); }
       });
       return;
     }
