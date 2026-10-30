@@ -439,24 +439,55 @@ t('app: ogni suono apre una finestra di priorità audio nel plugin, da 0,5 s pri
   assert.ok(rec.session.indexOf('transient') < 0, 'non usa audioSession');
 });
 
-t('app: la voce apre e chiude la priorità audio; se non segnala la fine la finestra si chiude lo stesso', () => {
-  const { q, advance, rec } = boot({ native: true });
+t('app: la voce passa dal motore di sintesi di Android (non da speechSynthesis) e abbassa la musica', () => {
+  const { q, w, advance, rec } = boot({ native: true });
   startTabata(q);
   advance(200);
-  const utt = rec.utts[rec.utts.length - 1];
-  utt.onstart();
-  assert.deepStrictEqual(calls(rec, 'duckSet').map((c) => c.o.on), [true]);
-  utt.onend();
-  advance(1000);
-  assert.deepStrictEqual(calls(rec, 'duckSet').map((c) => c.o.on), [true, false]);
-  // senza onend: scade da sola
-  advance(300);
-  const rec2 = boot({ native: true });
-  startTabata(rec2.q);
-  rec2.advance(200);
-  rec2.rec.utts[rec2.rec.utts.length - 1].onstart();
-  rec2.advance(20_000);
-  assert.deepStrictEqual(calls(rec2.rec, 'duckSet').map((c) => c.o.on), [true, false]);
+  const said = calls(rec, 'speak').map((c) => c.o);
+  assert.ok(said.length >= 1 && said[0].text === 'Preparati', JSON.stringify(said));
+  assert.deepStrictEqual(rec.spoken, [], 'speechSynthesis della WebView non viene usato');
+  assert.strictEqual(said[0].duck, true, 'in «Abbassa la musica» la voce chiede la priorità audio');
+  assert.strictEqual(said[0].volume, 1);
+  w.document.querySelector('input[name="audioMode"][value="mix"]').checked = true;
+  w.document.querySelector('input[name="audioMode"][value="mix"]').dispatchEvent(new w.Event('change'));
+  advance(10_300); // inizio del primo round
+  const later = calls(rec, 'speak').map((c) => c.o);
+  assert.ok(later.length > said.length && later.every((o, i) => i < said.length || o.duck === false), 'in «Affiancato» la voce non abbassa la musica');
+});
+
+t('app: voce spenta, nessun annuncio; volume e avvertimento se il telefono non ha un motore vocale', () => {
+  const off = boot({ native: true, settings: { voice: false } });
+  startTabata(off.q);
+  off.advance(12_000);
+  assert.strictEqual(calls(off.rec, 'speak').length, 0);
+
+  const b = boot({ native: true, settings: { volume: 0.4 } });
+  b.w.Capacitor.nativePromise = (plugin, method, o) => {
+    b.rec.native.push({ plugin, method, o });
+    return Promise.resolve(method === 'speak' ? { ok: false } : {});
+  };
+  startTabata(b.q);
+  b.advance(200);
+  assert.strictEqual(calls(b.rec, 'speak')[0].o.volume, 0.4);
+  return Promise.resolve().then(() => Promise.resolve()).then(() => {
+    assert.ok(b.q('#toast').textContent.includes('Voce non disponibile'), b.q('#toast').textContent);
+  });
+});
+
+t('app: pausa, salto e stop interrompono la voce', () => {
+  const { q, advance, rec } = boot({ native: true });
+  startTabata(q);
+  advance(2000);
+  const n0 = calls(rec, 'speakStop').length;
+  q('#run-toggle').click(); // pausa
+  assert.ok(calls(rec, 'speakStop').length > n0, 'pausa');
+  q('#run-toggle').click();
+  const n1 = calls(rec, 'speakStop').length;
+  q('#run-next-btn').click(); // salto
+  assert.ok(calls(rec, 'speakStop').length > n1, 'salto');
+  const n2 = calls(rec, 'speakStop').length;
+  q('#run-close').click(); // stop
+  assert.ok(calls(rec, 'speakStop').length > n2, 'stop');
 });
 
 t('app: pausa e salto annullano le finestre già programmate', () => {
@@ -479,9 +510,8 @@ t('app: modalità «Affiancato» non apre finestre di priorità audio', () => {
   const { q, advance, rec } = boot({ native: true, settings: { audioMode: 'mix' } });
   startTabata(q);
   advance(12_000);
-  rec.utts[rec.utts.length - 1].onstart && rec.utts[rec.utts.length - 1].onstart();
   assert.strictEqual(calls(rec, 'duckAt').length, 0);
-  assert.strictEqual(calls(rec, 'duckSet').length, 0);
+  assert.ok(calls(rec, 'speak').length > 0 && calls(rec, 'speak').every((c) => c.o.duck === false), 'la voce parla senza abbassare la musica');
   assert.ok(rec.beeps.length > 0, 'i suoni suonano comunque');
 });
 

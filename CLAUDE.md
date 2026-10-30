@@ -20,11 +20,13 @@ Modalità in `settings.audioMode`:
 - `duck`: `navigator.audioSession.type = 'transient'` attorno ai suoni. Pensata per iPhone/Safari; su Android Chrome non ha mostrato effetto.
 - `bg`: audio silenzioso in loop + Media Session per tenere viva l'app con altre app in primo piano. Può mettere in pausa la musica.
 
-- `native` (solo nell'app Android, predefinita lì): i suoni restano Web Audio programmati in anticipo (90 s) come in `mix`, ma il plugin nativo chiede l'audio focus `AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK` intorno a ogni suono (`duckAt`, con timer dell'Handler nativo: non soffrono il rallentamento dei timer della pagina) e intorno alla voce (`duckSet`). **Da verificare su telefono con Spotify**: l'app musicale potrebbe andare in pausa invece di abbassarsi (allora c'è sempre `mix`).
+- `native` (solo nell'app Android, predefinita lì): i suoni restano Web Audio programmati in anticipo (90 s) come in `mix`, ma il plugin nativo chiede l'audio focus `AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK` intorno a ogni suono (`duckAt`, con timer dell'Handler nativo: non soffrono il rallentamento dei timer della pagina) e intorno alla voce. **Da verificare su telefono con Spotify**: l'app musicale potrebbe andare in pausa invece di abbassarsi (allora c'è sempre `mix`).
 
 Nell'app le modalità `clip`, `duck` e `bg` sono nascoste, e `native` è nascosta sul web (`data-only` in `index.html`). `Native` in `app.js` è il ponte verso il plugin: sul web non fa nulla, quindi il codice resta unico.
 
 ### App Android
+- **La voce nell'app passa da `TextToSpeech` di Android** (`speak`/`speakStop` del plugin), non da `speechSynthesis`: nella WebView non parla. Il plugin abbassa la musica da solo mentre parla (solo in modalità `native`). Serve `<queries>` per `TTS_SERVICE` nel manifest (Android 11+).
+- `navigator.vibrate` nella WebView richiede il permesso `VIBRATE` nel manifest.
 - Dentro l'app non c'è service worker (i file sono nell'APK) e `location.origin` è `https://localhost`: i link di condivisione usano `SITE_URL` in `app.js` (`https://thaimer.pherio.net/`, il sito su Cloudflare Pages).
 - Un servizio in primo piano (con notifica Pausa/Termina) e il blocco della CPU durano quanto l'allenamento. La notifica richiede il permesso su Android 13+ (chiesto al primo avvio).
 - L'ID del pacchetto è `thaimer.app`; una volta pubblicata sul Play Store non si cambia più.

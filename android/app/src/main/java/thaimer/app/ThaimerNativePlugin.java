@@ -8,9 +8,12 @@ import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.view.Window;
 import android.view.WindowManager;
 
@@ -28,15 +31,19 @@ import com.getcapacitor.annotation.PermissionCallback;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * Ponte tra l'app web e Android: priorità audio (ducking della musica), servizio in primo piano
- * con notifica, schermo sempre acceso.
+ * Ponte tra l'app web e Android: voce, priorità audio (ducking della musica), servizio in primo
+ * piano con notifica, schermo sempre acceso.
+ *
+ * Voce: nella WebView di Android speechSynthesis non parla, quindi gli annunci passano dal motore
+ * di sintesi vocale del telefono (TextToSpeech).
  *
  * Priorità audio: l'audio dei bip resta quello di Web Audio, qui si chiede solo ad Android di far
  * abbassare le altre app. La finestra di abbassamento resta aperta finché c'è un suono in arrivo
- * (duckAt) o la voce sta parlando (duckSet), ed è gestita da un Handler nativo: non dipende dai
- * timer della pagina, che in background possono essere rallentati.
+ * (duckAt) o la voce sta parlando, ed è gestita da un Handler nativo: non dipende dai timer della
+ * pagina, che in background possono essere rallentati.
  */
 @CapacitorPlugin(
     name = "ThaimerNative",
@@ -46,16 +53,39 @@ public class ThaimerNativePlugin extends Plugin {
 
     private static ThaimerNativePlugin instance;
 
+    // dopo la fine della voce la musica resta bassa ancora un attimo: niente rialzi tra un annuncio e il bip successivo
+    private static final long DUCK_PAD_MS = 500;
+
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final List<Runnable> pending = new ArrayList<>();
     private final Runnable recheck = this::updateFocus;
     private final AudioManager.OnAudioFocusChangeListener focusListener = change -> { /* siamo noi a chiedere: ignoriamo */ };
 
     // tutto lo stato qui sotto si tocca solo dal thread principale
-    private boolean voiceHold = false;
     private long windowEnd = 0;
     private boolean focused = false;
     private AudioFocusRequest focusRequest;
+
+    private TextToSpeech tts;
+    private boolean ttsReady = false;
+    private boolean ttsFailed = false;
+    private PendingSpeech pendingSpeech; // annuncio arrivato prima che il motore fosse pronto
+    private int utteranceSeq = 0;
+    private String currentUtterance; // l'annuncio in corso
+    private boolean speechDucks = false;
+    private final Runnable speechWatchdog = () -> endSpeech(currentUtterance, false);
+
+    private static class PendingSpeech {
+        final String text;
+        final float volume;
+        final boolean duck;
+
+        PendingSpeech(String text, float volume, boolean duck) {
+            this.text = text;
+            this.volume = volume;
+            this.duck = duck;
+        }
+    }
 
     @Override
     public void load() {
@@ -67,6 +97,12 @@ public class ThaimerNativePlugin extends Plugin {
         if (instance == this) instance = null;
         handler.post(() -> {
             cancelWindows();
+            endSpeech(currentUtterance, false);
+            if (tts != null) {
+                tts.stop();
+                tts.shutdown();
+                tts = null;
+            }
             getContext().stopService(new Intent(getContext(), ThaimerService.class));
         });
     }
@@ -80,18 +116,115 @@ public class ThaimerNativePlugin extends Plugin {
         p.notifyListeners("action", data);
     }
 
-    /* ---------------- priorità audio ---------------- */
+    /* ---------------- voce ---------------- */
 
-    /** La voce sta parlando (true) o ha finito (false). */
+    /** Pronuncia un annuncio al posto di quello in corso. Risponde {ok:false} se il telefono non ha un motore vocale. */
     @PluginMethod
-    public void duckSet(PluginCall call) {
-        final boolean on = call.getBoolean("on", false);
+    public void speak(PluginCall call) {
+        final String text = call.getString("text", "");
+        final float volume = (float) call.getData().optDouble("volume", 1.0);
+        final boolean duck = call.getBoolean("duck", false);
         handler.post(() -> {
-            voiceHold = on;
-            updateFocus();
+            JSObject res = new JSObject();
+            if (text.isEmpty()) {
+                res.put("ok", true);
+            } else if (ttsFailed) {
+                res.put("ok", false);
+            } else if (ttsReady) {
+                speakNow(text, volume, duck);
+                res.put("ok", true);
+            } else {
+                pendingSpeech = new PendingSpeech(text, volume, duck);
+                if (tts == null) initTts();
+                res.put("ok", true);
+            }
+            call.resolve(res);
+        });
+    }
+
+    /** Interrompe l'annuncio in corso (e quello in attesa del motore). */
+    @PluginMethod
+    public void speakStop(PluginCall call) {
+        handler.post(() -> {
+            pendingSpeech = null;
+            if (tts != null && ttsReady) tts.stop();
+            endSpeech(currentUtterance, false);
             call.resolve();
         });
     }
+
+    private void initTts() {
+        tts = new TextToSpeech(getContext(), status -> handler.post(() -> {
+            if (tts == null) return;
+            if (status != TextToSpeech.SUCCESS) {
+                ttsFailed = true;
+                tts.shutdown();
+                tts = null;
+                pendingSpeech = null;
+                return;
+            }
+            // se l'italiano non c'è resta la lingua di sistema
+            tts.setLanguage(Locale.ITALY);
+            tts.setAudioAttributes(new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build());
+            tts.setSpeechRate(1.05f);
+            tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override
+                public void onStart(String utteranceId) { /* la finestra di abbassamento si apre già in speakNow */ }
+
+                @Override
+                public void onDone(String utteranceId) {
+                    handler.post(() -> endSpeech(utteranceId, true));
+                }
+
+                @Override
+                @SuppressWarnings("deprecation")
+                public void onError(String utteranceId) {
+                    handler.post(() -> endSpeech(utteranceId, true));
+                }
+
+                @Override
+                public void onStop(String utteranceId, boolean interrupted) {
+                    handler.post(() -> endSpeech(utteranceId, true));
+                }
+            });
+            ttsReady = true;
+            PendingSpeech p = pendingSpeech;
+            pendingSpeech = null;
+            if (p != null) speakNow(p.text, p.volume, p.duck);
+        }));
+    }
+
+    private void speakNow(String text, float volume, boolean duck) {
+        String id = "u" + (++utteranceSeq);
+        currentUtterance = id;
+        speechDucks = duck;
+        handler.removeCallbacks(speechWatchdog);
+        // la musica si abbassa subito, prima che la sintesi inizi a parlare
+        updateFocus();
+        Bundle params = new Bundle();
+        params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, Math.max(0f, Math.min(1f, volume)));
+        int r = tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, id);
+        if (r != TextToSpeech.SUCCESS) {
+            endSpeech(id, false);
+            return;
+        }
+        // rete di sicurezza se onDone non arrivasse mai: non lasciamo la musica bassa per sempre
+        handler.postDelayed(speechWatchdog, 4000 + text.length() * 120L);
+    }
+
+    /** Fine di un annuncio; ignora quelli già sostituiti da uno più recente. */
+    private void endSpeech(String id, boolean keepPad) {
+        if (id == null || !id.equals(currentUtterance)) return;
+        currentUtterance = null;
+        handler.removeCallbacks(speechWatchdog);
+        if (speechDucks && keepPad) windowEnd = Math.max(windowEnd, SystemClock.elapsedRealtime() + DUCK_PAD_MS);
+        updateFocus();
+    }
+
+    /* ---------------- priorità audio ---------------- */
 
     /** Apre una finestra di abbassamento tra delayMs, lunga holdMs. */
     @PluginMethod
@@ -113,7 +246,7 @@ public class ThaimerNativePlugin extends Plugin {
         });
     }
 
-    /** Chiude tutto: finestre già programmate e priorità audio. */
+    /** Annulla le finestre già programmate (non la voce in corso: la gestisce speakStop). */
     @PluginMethod
     public void duckCancel(PluginCall call) {
         handler.post(() -> {
@@ -125,7 +258,6 @@ public class ThaimerNativePlugin extends Plugin {
     private void cancelWindows() {
         for (Runnable r : pending) handler.removeCallbacks(r);
         pending.clear();
-        voiceHold = false;
         windowEnd = 0;
         updateFocus();
     }
@@ -133,9 +265,10 @@ public class ThaimerNativePlugin extends Plugin {
     private void updateFocus() {
         handler.removeCallbacks(recheck);
         long now = SystemClock.elapsedRealtime();
-        if (voiceHold || now < windowEnd) {
+        boolean speaking = currentUtterance != null && speechDucks;
+        if (speaking || now < windowEnd) {
             acquireFocus();
-            if (!voiceHold) handler.postDelayed(recheck, windowEnd - now + 1);
+            if (!speaking) handler.postDelayed(recheck, windowEnd - now + 1);
         } else {
             releaseFocus();
         }
