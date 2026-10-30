@@ -93,12 +93,28 @@
   /* Navigazione                                                         */
   /* ------------------------------------------------------------------ */
   const views = ['home', 'models', 'editor', 'run'];
-  function show(name) {
+  // leaf = la cronologia ha una voce in più della home: «indietro» la toglie e torna ai Preferiti invece di chiudere l'app
+  let leaf = false;
+  function show(name, fromPop) {
     for (const v of views) $('#' + v).hidden = v !== name;
     document.body.classList.toggle('running-view', name === 'run');
     if (name !== 'run') document.body.dataset.phase = 'idle';
     setThemeColor(name === 'run' ? getComputedStyle(document.body).getPropertyValue('--phase').trim() : '#0b0f14');
     window.scrollTo(0, 0);
+    const tabs = name === 'home' || name === 'models';
+    document.body.classList.toggle('has-tabs', tabs);
+    $('#tabbar').hidden = !tabs;
+    for (const [id, v] of [['tab-home', 'home'], ['tab-models', 'models']]) {
+      if (name === v) $('#' + id).setAttribute('aria-current', 'page');
+      else if (tabs) $('#' + id).removeAttribute('aria-current');
+    }
+    if (fromPop) return;
+    if (name === 'home') {
+      if (leaf) { leaf = false; history.back(); }
+    } else if (!leaf) {
+      leaf = true;
+      history.pushState({ v: name }, '');
+    }
   }
   function setThemeColor(c) {
     const m = document.querySelector('meta[name="theme-color"]');
@@ -111,8 +127,11 @@
   function renderHome() {
     const list = $('#list');
     list.replaceChildren();
-    if (!workouts.length) list.append(h('p', { class: 'empty' }, 'Nessun allenamento. Creane uno con «+ Nuovo» o ripristina gli esempi dalle impostazioni.'));
-    for (const w of workouts) {
+    const q = $('#q-home').value.trim().toLowerCase();
+    const shown = workouts.filter((w) => w.name.toLowerCase().includes(q));
+    if (!workouts.length) list.append(h('p', { class: 'empty' }, 'Nessun preferito. Creane uno con «+ Nuovo», scegline uno dai Modelli o ripristina gli esempi dalle impostazioni.'));
+    else if (!shown.length) list.append(h('p', { class: 'empty' }, 'Nessun risultato.'));
+    for (const w of shown) {
       const tl = Core.buildTimeline(w);
       list.append(
         h('article', { class: 'card', 'data-c': w.color },
@@ -132,11 +151,17 @@
   function renderModels() {
     const box = $('#models-list');
     box.replaceChildren();
+    const q = $('#q-models').value.trim().toLowerCase();
+    let any = false;
     for (const cat of Core.MODELS) {
+      const items = cat.items.filter((m) => !q || m.name.toLowerCase().includes(q) || cat.cat.toLowerCase().includes(q));
+      if (!items.length) continue;
+      any = true;
       const list = h('div', { class: 'list' });
-      for (const m of cat.items) {
+      for (const m of items) {
         const w = Core.sanitizeWorkout(m, false);
         const tl = Core.buildTimeline(w);
+        const inFav = workouts.some((x) => x.name === w.name);
         list.append(
           h('article', { class: 'card', 'data-c': w.color },
             h('button', { class: 'card-main', onclick: () => openRun(w), 'aria-label': 'Avvia ' + w.name },
@@ -144,11 +169,15 @@
               h('span', { class: 'meta' }, Core.summary(w))),
             h('div', { class: 'card-side' },
               h('span', { class: 'dur' }, tl.loop ? '∞' : Core.fmt(tl.total)),
-              h('button', { class: 'btn ghost', onclick: () => { workouts.push(Core.sanitizeWorkout(m, false)); saveWorkouts(); renderHome(); toast('«' + w.name + '» aggiunto ai tuoi allenamenti'); } }, 'Aggiungi')))
+              h('button', {
+                class: 'btn ghost', disabled: inFav, 'aria-label': (inFav ? 'Già nei preferiti: ' : 'Aggiungi ai preferiti: ') + w.name,
+                onclick: () => { workouts.push(Core.sanitizeWorkout(m, false)); saveWorkouts(); renderHome(); renderModels(); toast('«' + w.name + '» aggiunto ai preferiti'); },
+              }, inFav ? '♥ Nei preferiti' : '♡ Aggiungi')))
         );
       }
       box.append(h('h2', { class: 'cat' }, cat.cat), list);
     }
+    if (!any) box.append(h('p', { class: 'empty' }, 'Nessun risultato.'));
   }
 
   /* ------------------------------------------------------------------ */
@@ -903,9 +932,31 @@
     renderHome();
     show('home');
 
-    $('#btn-new').addEventListener('click', () => openEditor(null));
-    $('#btn-models').addEventListener('click', () => { renderModels(); show('models'); });
-    $('#models-back').addEventListener('click', () => show('home'));
+    for (const b of document.querySelectorAll('.js-new')) b.addEventListener('click', () => openEditor(null));
+    $('#tab-home').addEventListener('click', () => show('home'));
+    $('#tab-models').addEventListener('click', () => { renderModels(); show('models'); });
+    for (const b of document.querySelectorAll('.js-search')) {
+      b.addEventListener('click', () => {
+        const input = $('#' + b.dataset.q);
+        input.hidden = !input.hidden;
+        if (input.hidden) { input.value = ''; input.dispatchEvent(new Event('input')); } else input.focus();
+      });
+    }
+    $('#q-home').addEventListener('input', renderHome);
+    $('#q-models').addEventListener('input', renderModels);
+    // tasto indietro del telefono: dalle altre schermate si torna ai Preferiti; dai Preferiti l'app si chiude
+    window.addEventListener('popstate', () => {
+      if (!leaf) return; // nostra history.back(): la home è già a schermo
+      leaf = false;
+      if (!$('#run').hidden) {
+        if ((run.state === 'running' || run.state === 'paused') && !confirm('Interrompere l\'allenamento?')) {
+          leaf = true;
+          history.pushState({ v: 'run' }, '');
+          return;
+        }
+        stopRun();
+      } else show('home', true);
+    });
     const openSettings = () => { syncSettingsUI(); $('#settings').showModal(); };
     $('#btn-settings').addEventListener('click', openSettings);
     $('#run-settings').append($('#btn-settings svg').cloneNode(true));
