@@ -42,6 +42,7 @@
       w[k] = clampInt(o[k], min, max, def);
     }
     w.loop = o.loop === true;
+    w.color = clampInt(o.color, 0, 5, 0);
     const ex = Array.isArray(o.exercises) ? o.exercises : [];
     w.exercises = ex.map((x) => cleanText(x, 40)).filter(Boolean).slice(0, 40);
     return w;
@@ -221,6 +222,7 @@
   function encodeShare(w) {
     const o = { v: 1, n: w.name, pr: w.prepare, wu: w.warmup, w: w.work, r: w.rest, ro: w.rounds, s: w.sets, sr: w.setRest, cd: w.cooldown };
     if (w.loop) o.lp = 1;
+    if (w.color) o.c = w.color;
     if (w.exercises.length) o.ex = w.exercises;
     return toB64(JSON.stringify(o));
   }
@@ -231,20 +233,69 @@
       if (!str || str.length > 6000) return null;
       const o = JSON.parse(fromB64(str));
       if (!o || o.v !== 1) return null;
-      return sanitizeWorkout({ name: o.n, prepare: o.pr, warmup: o.wu, work: o.w, rest: o.r, rounds: o.ro, sets: o.s, setRest: o.sr, cooldown: o.cd, exercises: o.ex, loop: o.lp === 1 }, false);
+      return sanitizeWorkout({ name: o.n, prepare: o.pr, warmup: o.wu, work: o.w, rest: o.r, rounds: o.ro, sets: o.s, setRest: o.sr, cooldown: o.cd, exercises: o.ex, loop: o.lp === 1, color: o.c }, false);
     } catch (e) {
       return null;
     }
   }
 
   const PRESETS = [
-    { name: 'Tabata', prepare: 10, warmup: 0, work: 20, rest: 10, rounds: 8, sets: 1, setRest: 0, cooldown: 0, exercises: [] },
-    { name: 'HIIT 30/30', prepare: 10, warmup: 60, work: 30, rest: 30, rounds: 10, sets: 1, setRest: 0, cooldown: 60, exercises: [] },
-    { name: 'Circuito 6 esercizi', prepare: 10, warmup: 120, work: 40, rest: 20, rounds: 6, sets: 3, setRest: 60, cooldown: 120, exercises: ['Squat', 'Push-up', 'Affondi', 'Plank', 'Burpee', 'Mountain climber'] },
-    { name: 'Round di boxe', prepare: 10, warmup: 0, work: 180, rest: 60, rounds: 6, sets: 1, setRest: 0, cooldown: 0, exercises: [] },
-    { name: 'EMOM 12 minuti', prepare: 10, warmup: 0, work: 45, rest: 15, rounds: 12, sets: 1, setRest: 0, cooldown: 0, exercises: [] },
-    { name: 'Stretching', prepare: 10, warmup: 0, work: 30, rest: 5, rounds: 10, sets: 1, setRest: 0, cooldown: 0, exercises: [] },
+    { color: 1, name: 'Tabata', prepare: 10, warmup: 0, work: 20, rest: 10, rounds: 8, sets: 1, setRest: 0, cooldown: 0, exercises: [] },
+    { color: 2, name: 'HIIT 30/30', prepare: 10, warmup: 60, work: 30, rest: 30, rounds: 10, sets: 1, setRest: 0, cooldown: 60, exercises: [] },
+    { color: 5, name: 'Circuito 6 esercizi', prepare: 10, warmup: 120, work: 40, rest: 20, rounds: 6, sets: 3, setRest: 60, cooldown: 120, exercises: ['Squat', 'Push-up', 'Affondi', 'Plank', 'Burpee', 'Mountain climber'] },
+    { color: 0, name: 'Round di boxe', prepare: 10, warmup: 0, work: 180, rest: 60, rounds: 6, sets: 1, setRest: 0, cooldown: 0, exercises: [] },
+    { color: 3, name: 'EMOM 12 minuti', prepare: 10, warmup: 0, work: 45, rest: 15, rounds: 12, sets: 1, setRest: 0, cooldown: 0, exercises: [] },
+    { color: 4, name: 'Stretching', prepare: 10, warmup: 0, work: 30, rest: 5, rounds: 10, sets: 1, setRest: 0, cooldown: 0, exercises: [] },
   ];
 
-  return { LIMITS, sanitizeWorkout, buildTimeline, buildCues, firstIdx, segIndexAt, fmt, fmtShort, summary, encodeShare, decodeShare, newId, PRESETS };
+  // Catalogo «Modelli»: non finisce nella lista dell'utente finché non preme «Aggiungi» (o lo avvia al volo).
+  // color = indice nella tavolozza del brand (--c0…--c5 in style.css).
+  const M = (color, name, o) => Object.assign({ color, name, prepare: 10, warmup: 0, rest: 0, rounds: 1, sets: 1, setRest: 0, cooldown: 0, exercises: [] }, o);
+  const RECUPERO = (color, name, secs) => M(color, name, { prepare: 0, work: secs, exercises: ['Recupero'] });
+  const CIRCUITO = ['Squat', 'Push-up', 'Affondi', 'Plank', 'Burpee', 'Mountain climber'];
+  const MODELS = [
+    { cat: 'HIIT e cardio', items: [
+      M(1, 'Tabata', { work: 20, rest: 10, rounds: 8 }),
+      M(2, 'Intervallo 40/20', { warmup: 120, work: 40, rest: 20, rounds: 10, sets: 3, setRest: 60, cooldown: 120 }),
+      M(2, 'HIIT per principianti', { warmup: 60, work: 30, rest: 30, rounds: 8, sets: 2, setRest: 60, cooldown: 60 }),
+      M(3, 'HIIT avanzato 45/15', { warmup: 120, work: 45, rest: 15, rounds: 10, sets: 2, setRest: 60, cooldown: 120 }),
+      M(5, 'Total body', { warmup: 60, work: 40, rest: 20, rounds: 6, sets: 2, setRest: 60, cooldown: 60, exercises: CIRCUITO }),
+      M(1, 'Cardio e core', { warmup: 60, work: 30, rest: 15, rounds: 6, sets: 2, setRest: 45, cooldown: 60, exercises: ['Jumping jack', 'Crunch', 'High knees', 'Bicycle crunch', 'Plank', 'Mountain climber'] }),
+    ] },
+    { cat: 'Forza', items: [
+      RECUPERO(0, 'Recupero breve', 60),
+      RECUPERO(4, 'Recupero standard', 90),
+      RECUPERO(2, 'Recupero lungo', 180),
+      M(3, 'Parte superiore', { warmup: 120, work: 40, rest: 60, rounds: 5, sets: 3, setRest: 90, cooldown: 120, exercises: ['Panca piana', 'Rematore', 'Military press', 'Curl bicipiti', 'French press'] }),
+      M(5, 'Parte inferiore', { warmup: 120, work: 40, rest: 60, rounds: 5, sets: 3, setRest: 90, cooldown: 120, exercises: ['Squat', 'Stacco rumeno', 'Affondi', 'Leg curl', 'Calf raise'] }),
+    ] },
+    { cat: 'A casa', items: [
+      M(1, 'Circuito a casa', { warmup: 60, work: 40, rest: 20, rounds: 10, sets: 3, setRest: 60, cooldown: 60, exercises: ['Squat', 'Push-up', 'Affondi', 'Plank', 'Burpee', 'Mountain climber', 'Ponte glutei', 'Jumping jack', 'Crunch', 'Dip su sedia'] }),
+      M(0, 'Senza attrezzi', { warmup: 60, work: 30, rest: 15, rounds: 8, sets: 2, setRest: 45, cooldown: 60, exercises: ['Squat', 'Push-up', 'Affondi alternati', 'Plank', 'Jumping jack', 'Superman', 'Mountain climber', 'Squat jump'] }),
+    ] },
+    { cat: 'CrossFit', items: [
+      M(2, 'EMOM 20', { work: 45, rest: 15, rounds: 20 }),
+      M(3, 'AMRAP 20', { work: 1200, exercises: ['AMRAP'] }),
+      M(5, 'Cinque stazioni', { work: 60, rounds: 5, sets: 3, setRest: 60, exercises: ['Wall ball', 'Sumo deadlift high pull', 'Box jump', 'Push press', 'Vogatore'] }),
+    ] },
+    { cat: 'Boxe e arti marziali', items: [
+      M(0, 'Round 60/30', { work: 60, rest: 30, rounds: 5 }),
+      M(1, 'Round di boxe', { work: 180, rest: 60, rounds: 12 }),
+      M(0, 'Round MMA', { work: 300, rest: 60, rounds: 5 }),
+      M(4, 'Sacco pesante', { warmup: 120, work: 120, rest: 30, rounds: 6, cooldown: 60 }),
+      M(3, 'Muay thai', { warmup: 180, work: 180, rest: 120, rounds: 5, cooldown: 120 }),
+    ] },
+    { cat: 'Corsa e resistenza', items: [
+      M(3, 'Intervalli di corsa', { warmup: 300, work: 60, rest: 60, rounds: 10, cooldown: 300, exercises: ['Corsa'] }),
+      M(5, '5 km per principianti', { warmup: 300, work: 60, rest: 90, rounds: 8, cooldown: 300, exercises: ['Corsa'] }),
+      M(1, 'Sprint 30/30', { warmup: 300, work: 30, rest: 30, rounds: 10, cooldown: 180, exercises: ['Sprint'] }),
+    ] },
+    { cat: 'Yoga e mobilità', items: [
+      M(0, 'Stretching 60/15', { work: 60, rest: 15, rounds: 10 }),
+      M(4, 'Meditazione 10 minuti', { work: 600, exercises: ['Respira'] }),
+      M(2, 'Flow mattutino', { work: 40, rest: 10, rounds: 6, exercises: ['Cat-cow', 'Cane a testa in giù', 'Guerriero', 'Torsione seduta', 'Ponte', 'Respiro profondo'] }),
+    ] },
+  ];
+
+  return { LIMITS, sanitizeWorkout, buildTimeline, buildCues, firstIdx, segIndexAt, fmt, fmtShort, summary, encodeShare, decodeShare, newId, PRESETS, MODELS };
 });

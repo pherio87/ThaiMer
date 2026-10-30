@@ -4,6 +4,7 @@ PWA statica (HTML/CSS/JS vanilla, nessuna build) con timer a intervalli per alle
 
 ## Struttura
 - `public/core.js`: logica pura, senza DOM (timeline delle fasi, generazione di suoni e annunci, condivisione tramite link). Funziona anche in Node.
+- Catalogo «Modelli» (`Core.MODELS`, per categoria, nella schermata `#models` di `app.js`): non entra nella lista dell'utente finché non preme «Aggiungi»; toccandolo parte al volo. Ogni allenamento ha `color` (0-5, tavolozza `--c0…--c5` in `style.css`) che dà la striscia colorata sulla scheda; `color` viaggia anche nel link condiviso (campo `c`, opzionale). Un nuovo modello deve passare il test «modelli» di `test_core.js` (limiti, durata, annunci).
 - `public/app.js`: interfaccia, audio, ciclo di vita dell'allenamento, impostazioni.
 - `public/sw.js`: service worker per l'uso offline. **A ogni modifica ai file di `public/` cambiare `CACHE` (es. `gym-timer-v3`)**, altrimenti i telefoni restano sulla versione vecchia.
 - `android/` + `capacitor.config.json`: app Android (Capacitor 8, `webDir: public`). Codice nativo scritto da noi: `android/app/src/main/java/thaimer/app/` (`ThaimerNativePlugin` = priorità audio, schermo acceso, notifica; `ThaimerService` = servizio in primo piano). Il resto è il progetto generato da Capacitor. `android/app/src/main/assets/public` è una copia generata (ignorata da git): la crea `npm run android:sync`, e la CI prima di compilare.

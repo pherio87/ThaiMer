@@ -163,4 +163,30 @@ t('loop: il timeline copre ore, niente cooldown/serie, "Ultimo round" mai annunc
   assert.strictEqual(Core.decodeShare(Core.encodeShare(Core.sanitizeWorkout({ work: 30 }))).loop, false);
 });
 
+t('modelli: ogni modello è valido, ha colore della tavolozza, una timeline sensata e annunci senza errori', () => {
+  const names = new Set();
+  assert.ok(Core.MODELS.length >= 6);
+  for (const cat of Core.MODELS) {
+    assert.ok(cat.cat && cat.items.length > 0, 'categoria vuota: ' + cat.cat);
+    for (const m of cat.items) {
+      const w = Core.sanitizeWorkout(m);
+      assert.ok(!names.has(w.name), 'nome doppio: ' + w.name);
+      names.add(w.name);
+      for (const k of Object.keys(Core.LIMITS)) assert.strictEqual(w[k], m[k], w.name + ': ' + k + ' fuori limite');
+      assert.strictEqual(w.color, m.color, w.name + ': colore');
+      assert.ok(m.color >= 0 && m.color <= 5);
+      const tl = Core.buildTimeline(w);
+      assert.ok(tl.segs.length > 0 && tl.total >= 60000 && tl.total <= 3 * 3600 * 1000, w.name + ': durata ' + tl.total);
+      Core.buildCues(tl, { countdown: 3, extras: true });
+    }
+  }
+});
+
+t('il colore sopravvive a sanitize e al link condiviso; un valore strano torna al predefinito', () => {
+  const w = Core.sanitizeWorkout({ name: 'X', work: 30, color: 4 });
+  assert.strictEqual(Core.decodeShare(Core.encodeShare(w)).color, 4);
+  assert.strictEqual(Core.sanitizeWorkout({ color: 99 }).color, 5);
+  assert.strictEqual(Core.sanitizeWorkout({ color: 'x' }).color, 0);
+});
+
 console.log('\n' + passed + ' test superati');
