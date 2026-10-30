@@ -1,0 +1,94 @@
+name: APK Android
+
+# Compila l'app Android (Capacitor) e pubblica l'APK di prova come allegato dell'esecuzione.
+# Non tocca Cloudflare Pages: quello pubblica solo la cartella public/ da main.
+on:
+  push:
+    paths:
+      - 'public/**'
+      - 'android/**'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # in parallelo all'APK: il test del loop simula un'ora intera e dura qualche minuto
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VERSION_CODE: ${{ github.run_number }}
+      HAS_KEY: ${{ secrets.KEYSTORE_B64 != '' }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # il runner ha già l'SDK Android; AGP scarica da solo la piattaforma mancante se le licenze sono accettate
+      - name: Accetta le licenze dell'SDK
+        run: yes | sdkmanager --licenses > /dev/null || true
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: npm ci
+
+      - name: Copia la web nel progetto Android
+        run: npx cap sync android
+
+      # senza i segreti la compilazione resta quella di prima (chiave di debug)
+      - name: Chiave di firma
+        if: env.HAS_KEY == 'true'
+        run: |
+          echo "${{ secrets.KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/thaimer.jks"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/thaimer.jks" >> "$GITHUB_ENV"
+
+      - name: Compila l'APK di prova
+        working-directory: android
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Compila il bundle per il Play Store
+        if: env.HAS_KEY == 'true'
+        working-directory: android
+        run: ./gradlew bundleRelease --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thaimer-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: env.HAS_KEY == 'true'
+        with:
+          name: thaimer-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error

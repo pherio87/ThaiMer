@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Thaimer</string>
+    <string name="title_activity_main">Thaimer</string>
+    <string name="package_name">thaimer.app</string>
+    <string name="custom_url_scheme">thaimer.app</string>
+</resources>
