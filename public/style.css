@@ -103,9 +103,9 @@ body.running-view { overflow: hidden; height: 100vh; height: 100dvh; }
 body[data-phase="prep"]    { --phase: #a16207; }
 body[data-phase="warmup"]  { --phase: #6d28d9; }
 body[data-phase="cool"]    { --phase: #6d28d9; }
-body[data-phase="work"]    { --phase: #c2410c; }
-body[data-phase="rest"]    { --phase: #0f766e; }
-body[data-phase="setrest"] { --phase: #1d4ed8; }
+body[data-phase="work"]    { --phase: #0e7490; }
+body[data-phase="rest"]    { --phase: #b91c1c; }
+body[data-phase="setrest"] { --phase: #ca8a04; }
 body[data-phase="done"]    { --phase: #15803d; }
 body[data-phase="ready"]   { --phase: #1d252f; }
 body.running-view { background: var(--phase); }
