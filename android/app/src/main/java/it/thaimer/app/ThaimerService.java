@@ -97,7 +97,7 @@ public class ThaimerService extends Service {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
-            .setCategory(NotificationCompat.CATEGORY_WORKOUT)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .addAction(0, paused ? "Riprendi" : "Pausa", actionIntent(ctx, paused ? ACTION_RESUME : ACTION_PAUSE))
             .addAction(0, "Termina", actionIntent(ctx, ACTION_STOP));
