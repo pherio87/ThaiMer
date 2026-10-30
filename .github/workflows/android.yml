@@ -47,7 +47,9 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: android-actions/setup-android@v3
+      # il runner ha già l'SDK Android; AGP scarica da solo la piattaforma mancante se le licenze sono accettate
+      - name: Accetta le licenze dell'SDK
+        run: yes | sdkmanager --licenses > /dev/null || true
 
       - uses: gradle/actions/setup-gradle@v4
 
