@@ -69,7 +69,13 @@ public class ThaimerNativePlugin extends Plugin {
     private TextToSpeech tts;
     private boolean ttsReady = false;
     private boolean ttsFailed = false;
+    private boolean langOk = true; // la voce italiana è installata?
     private PendingSpeech pendingSpeech; // annuncio arrivato prima che il motore fosse pronto
+    private final Runnable pendingTimeout = () -> {
+        PendingSpeech p = pendingSpeech;
+        pendingSpeech = null;
+        if (p != null) report(p.call, false, "timeout");
+    };
     private int utteranceSeq = 0;
     private String currentUtterance; // l'annuncio in corso
     private boolean speechDucks = false;
@@ -79,11 +85,13 @@ public class ThaimerNativePlugin extends Plugin {
         final String text;
         final float volume;
         final boolean duck;
+        final PluginCall call;
 
-        PendingSpeech(String text, float volume, boolean duck) {
+        PendingSpeech(String text, float volume, boolean duck, PluginCall call) {
             this.text = text;
             this.volume = volume;
             this.duck = duck;
+            this.call = call;
         }
     }
 
@@ -118,34 +126,47 @@ public class ThaimerNativePlugin extends Plugin {
 
     /* ---------------- voce ---------------- */
 
-    /** Pronuncia un annuncio al posto di quello in corso. Risponde {ok:false} se il telefono non ha un motore vocale. */
+    /**
+     * Pronuncia un annuncio al posto di quello in corso. Risponde {ok, reason?, lang}: ok=false se il
+     * motore vocale non parte (reason: init, speak, timeout), lang=false se manca la voce italiana.
+     */
     @PluginMethod
     public void speak(PluginCall call) {
         final String text = call.getString("text", "");
         final float volume = (float) call.getData().optDouble("volume", 1.0);
         final boolean duck = call.getBoolean("duck", false);
         handler.post(() -> {
-            JSObject res = new JSObject();
             if (text.isEmpty()) {
-                res.put("ok", true);
+                report(call, true, null);
             } else if (ttsFailed) {
-                res.put("ok", false);
+                report(call, false, "init");
             } else if (ttsReady) {
-                speakNow(text, volume, duck);
-                res.put("ok", true);
+                report(call, speakNow(text, volume, duck), "speak");
             } else {
-                pendingSpeech = new PendingSpeech(text, volume, duck);
+                // il motore si sta avviando: l'annuncio più recente sostituisce quello in attesa
+                if (pendingSpeech != null) report(pendingSpeech.call, true, null);
+                pendingSpeech = new PendingSpeech(text, volume, duck, call);
+                handler.removeCallbacks(pendingTimeout);
+                handler.postDelayed(pendingTimeout, 8000);
                 if (tts == null) initTts();
-                res.put("ok", true);
             }
-            call.resolve(res);
         });
+    }
+
+    private void report(PluginCall call, boolean ok, String reasonIfFailed) {
+        JSObject res = new JSObject();
+        res.put("ok", ok);
+        if (!ok && reasonIfFailed != null) res.put("reason", reasonIfFailed);
+        res.put("lang", langOk);
+        call.resolve(res);
     }
 
     /** Interrompe l'annuncio in corso (e quello in attesa del motore). */
     @PluginMethod
     public void speakStop(PluginCall call) {
         handler.post(() -> {
+            handler.removeCallbacks(pendingTimeout);
+            if (pendingSpeech != null) report(pendingSpeech.call, true, null);
             pendingSpeech = null;
             if (tts != null && ttsReady) tts.stop();
             endSpeech(currentUtterance, false);
@@ -156,15 +177,18 @@ public class ThaimerNativePlugin extends Plugin {
     private void initTts() {
         tts = new TextToSpeech(getContext(), status -> handler.post(() -> {
             if (tts == null) return;
+            handler.removeCallbacks(pendingTimeout);
             if (status != TextToSpeech.SUCCESS) {
                 ttsFailed = true;
                 tts.shutdown();
                 tts = null;
+                PendingSpeech failed = pendingSpeech;
                 pendingSpeech = null;
+                if (failed != null) report(failed.call, false, "init");
                 return;
             }
             // se l'italiano non c'è resta la lingua di sistema
-            tts.setLanguage(Locale.ITALY);
+            langOk = tts.setLanguage(Locale.ITALY) >= TextToSpeech.LANG_AVAILABLE;
             tts.setAudioAttributes(new AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -193,11 +217,11 @@ public class ThaimerNativePlugin extends Plugin {
             ttsReady = true;
             PendingSpeech p = pendingSpeech;
             pendingSpeech = null;
-            if (p != null) speakNow(p.text, p.volume, p.duck);
+            if (p != null) report(p.call, speakNow(p.text, p.volume, p.duck), "speak");
         }));
     }
 
-    private void speakNow(String text, float volume, boolean duck) {
+    private boolean speakNow(String text, float volume, boolean duck) {
         String id = "u" + (++utteranceSeq);
         currentUtterance = id;
         speechDucks = duck;
@@ -209,10 +233,11 @@ public class ThaimerNativePlugin extends Plugin {
         int r = tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, id);
         if (r != TextToSpeech.SUCCESS) {
             endSpeech(id, false);
-            return;
+            return false;
         }
         // rete di sicurezza se onDone non arrivasse mai: non lasciamo la musica bassa per sempre
         handler.postDelayed(speechWatchdog, 4000 + text.length() * 120L);
+        return true;
     }
 
     /** Fine di un annuncio; ignora quelli già sostituiti da uno più recente. */
