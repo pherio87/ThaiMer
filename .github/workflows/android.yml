@@ -18,6 +18,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # in parallelo all'APK: il test del loop simula un'ora intera e dura qualche minuto
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
   apk:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -39,9 +52,6 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - run: npm ci
-
-      - name: Test
-        run: npm test
 
       - name: Copia la web nel progetto Android
         run: npx cap sync android
