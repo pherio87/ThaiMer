@@ -556,18 +556,16 @@ t('app: fine allenamento, il servizio si ferma dopo la fanfara', () => {
   assert.strictEqual(calls(rec, 'serviceStop').length, 1);
 });
 
-t('app: la condivisione non produce link https://localhost; sul web usa l\'indirizzo della pagina', () => {
+t('app: il link di condivisione punta al sito pubblico, non a https://localhost; sul web usa l\'indirizzo della pagina', () => {
   const a = boot({ native: true });
-  a.q('#list .card-main').click(); // apre l'allenamento: servono l'editor e il pulsante condividi
-  a.q('#run-close').click();
   a.q('#list .card .btn.ghost').click();
   a.q('#ed-share').click();
-  assert.strictEqual(a.rec.shares.length, 0, 'nessun link inviato');
-  assert.ok(a.q('#toast').textContent.includes('non ancora disponibile'));
   const b = boot();
   b.q('#list .card .btn.ghost').click();
   b.q('#ed-share').click();
   return Promise.resolve().then(() => {
+    assert.strictEqual(a.rec.shares.length, 1);
+    assert.ok(a.rec.shares[0].url.startsWith('https://thaimer.pherio.net/#w='), a.rec.shares[0].url);
     assert.strictEqual(b.rec.shares.length, 1);
     assert.ok(b.rec.shares[0].url.startsWith('https://gym.example/#w='), b.rec.shares[0].url);
   });

@@ -48,7 +48,7 @@ npm run android:open     # apre Android Studio: Run ▶ su telefono o emulatore
 
 **Prova con Spotify**: avvia la musica, apri Thaimer (Impostazioni → «Abbassa la musica» è già attiva), premi «Prova suono e voce», poi lancia un Tabata e passa a Spotify. Controlla che la musica si abbassi sui bip e sulla voce e poi risalga, che non vada in pausa, che l'allenamento prosegua a schermo spento e che i pulsanti della notifica funzionino.
 
-Prima della pubblicazione sul Play Store restano da fare: dominio per i link di condivisione (`SITE_URL` in `public/app.js`), apertura dei link `#w=…` direttamente nell'app, firma di rilascio, scheda dello store.
+Prima della pubblicazione sul Play Store restano da fare: apertura dei link `thaimer.pherio.net/#w=…` direttamente nell'app (App Links, serve la firma di rilascio), firma di rilascio, scheda dello store.
 
 ## Prova dell'audio con la musica
 Impostazioni → «Audio e musica di altre app». Per ogni modalità: avvia la musica, torna all'app, premi «Prova suono e voce», poi lancia un Tabata passando all'app della musica e tornando.

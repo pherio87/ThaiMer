@@ -6,7 +6,7 @@ PWA statica (HTML/CSS/JS vanilla, nessuna build) con timer a intervalli per alle
 - `public/core.js`: logica pura, senza DOM (timeline delle fasi, generazione di suoni e annunci, condivisione tramite link). Funziona anche in Node.
 - `public/app.js`: interfaccia, audio, ciclo di vita dell'allenamento, impostazioni.
 - `public/sw.js`: service worker per l'uso offline. **A ogni modifica ai file di `public/` cambiare `CACHE` (es. `gym-timer-v3`)**, altrimenti i telefoni restano sulla versione vecchia.
-- `android/` + `capacitor.config.json`: app Android (Capacitor 8, `webDir: public`). Codice nativo scritto da noi: `android/app/src/main/java/it/thaimer/app/` (`ThaimerNativePlugin` = priorità audio, schermo acceso, notifica; `ThaimerService` = servizio in primo piano). Il resto è il progetto generato da Capacitor. `android/app/src/main/assets/public` è una copia generata (ignorata da git): la crea `npm run android:sync`, e la CI prima di compilare.
+- `android/` + `capacitor.config.json`: app Android (Capacitor 8, `webDir: public`). Codice nativo scritto da noi: `android/app/src/main/java/thaimer/app/` (`ThaimerNativePlugin` = priorità audio, schermo acceso, notifica; `ThaimerService` = servizio in primo piano). Il resto è il progetto generato da Capacitor. `android/app/src/main/assets/public` è una copia generata (ignorata da git): la crea `npm run android:sync`, e la CI prima di compilare.
 - `.github/workflows/android.yml`: compila l'APK di prova a ogni push che tocca `public/` o `android/` e lo allega all'esecuzione.
 - `tests/`: `npm test` esegue i test della logica e un test dell'interfaccia in jsdom con orologio e audio simulati.
 
@@ -25,9 +25,9 @@ Modalità in `settings.audioMode`:
 Nell'app le modalità `clip`, `duck` e `bg` sono nascoste, e `native` è nascosta sul web (`data-only` in `index.html`). `Native` in `app.js` è il ponte verso il plugin: sul web non fa nulla, quindi il codice resta unico.
 
 ### App Android
-- Dentro l'app non c'è service worker (i file sono nell'APK) e `location.origin` è `https://localhost`: i link di condivisione usano `SITE_URL` in `app.js`, che va impostato con l'indirizzo pubblico del sito (finché è vuoto, «Condividi» avvisa che non è disponibile).
+- Dentro l'app non c'è service worker (i file sono nell'APK) e `location.origin` è `https://localhost`: i link di condivisione usano `SITE_URL` in `app.js` (`https://thaimer.pherio.net/`, il sito su Cloudflare Pages).
 - Un servizio in primo piano (con notifica Pausa/Termina) e il blocco della CPU durano quanto l'allenamento. La notifica richiede il permesso su Android 13+ (chiesto al primo avvio).
-- L'ID del pacchetto è `it.thaimer.app`; una volta pubblicata sul Play Store non si cambia più.
+- L'ID del pacchetto è `thaimer.app`; una volta pubblicata sul Play Store non si cambia più.
 - Gli APK di prova della CI sono firmati con una chiave di debug diversa a ogni esecuzione: per installare una versione nuova sopra una vecchia bisogna prima disinstallare la vecchia.
 - Dopo una modifica al codice nativo o alla struttura di `android/` controlla che la CI sia verde: l'SDK Android non è disponibile negli ambienti cloud, la compilazione si prova lì.
 

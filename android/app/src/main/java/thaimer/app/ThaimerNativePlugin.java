@@ -1,4 +1,4 @@
-package it.thaimer.app;
+package thaimer.app;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
