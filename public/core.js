@@ -254,6 +254,13 @@
   const RECUPERO = (color, name, secs) => M(color, name, { prepare: 0, work: secs, exercises: ['Recupero'] });
   const CIRCUITO = ['Squat', 'Push-up', 'Affondi', 'Plank', 'Burpee', 'Mountain climber'];
   const MODELS = [
+    { cat: 'Muay Thai e Boxe', items: [
+      M(0, 'Round 60/30', { work: 60, rest: 30, rounds: 5 }),
+      M(1, 'Round di boxe', { work: 180, rest: 60, rounds: 12 }),
+      M(0, 'Round MMA', { work: 300, rest: 60, rounds: 5 }),
+      M(4, 'Sacco pesante', { warmup: 120, work: 120, rest: 30, rounds: 6, cooldown: 60 }),
+      M(3, 'Muay thai', { warmup: 180, work: 180, rest: 120, rounds: 5, cooldown: 120 }),
+    ] },
     { cat: 'HIIT e cardio', items: [
       M(1, 'Tabata', { work: 20, rest: 10, rounds: 8 }),
       M(2, 'Intervallo 40/20', { warmup: 120, work: 40, rest: 20, rounds: 10, sets: 3, setRest: 60, cooldown: 120 }),
@@ -277,13 +284,6 @@
       M(2, 'EMOM 20', { work: 45, rest: 15, rounds: 20 }),
       M(3, 'AMRAP 20', { work: 1200, exercises: ['AMRAP'] }),
       M(5, 'Cinque stazioni', { work: 60, rounds: 5, sets: 3, setRest: 60, exercises: ['Wall ball', 'Sumo deadlift high pull', 'Box jump', 'Push press', 'Vogatore'] }),
-    ] },
-    { cat: 'Boxe e arti marziali', items: [
-      M(0, 'Round 60/30', { work: 60, rest: 30, rounds: 5 }),
-      M(1, 'Round di boxe', { work: 180, rest: 60, rounds: 12 }),
-      M(0, 'Round MMA', { work: 300, rest: 60, rounds: 5 }),
-      M(4, 'Sacco pesante', { warmup: 120, work: 120, rest: 30, rounds: 6, cooldown: 60 }),
-      M(3, 'Muay thai', { warmup: 180, work: 180, rest: 120, rounds: 5, cooldown: 120 }),
     ] },
     { cat: 'Corsa e resistenza', items: [
       M(3, 'Intervalli di corsa', { warmup: 300, work: 60, rest: 60, rounds: 10, cooldown: 300, exercises: ['Corsa'] }),

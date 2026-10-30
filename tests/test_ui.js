@@ -615,7 +615,8 @@ t('modelli: schermata per categorie, avvio al volo senza salvare, «Aggiungi» l
   assert.strictEqual(q('#models').hidden, false);
   assert.strictEqual(q('#home').hidden, true);
   const cats = [...w.document.querySelectorAll('#models-list .cat')].map((h) => h.textContent);
-  assert.ok(cats.includes('HIIT e cardio') && cats.includes('Boxe e arti marziali') && cats.length >= 6, cats.join(','));
+  assert.ok(cats.includes('HIIT e cardio') && cats.includes('Muay Thai e Boxe') && cats.length >= 6, cats.join(','));
+  assert.strictEqual(cats[0], 'Muay Thai e Boxe', 'la prima categoria è Muay Thai e Boxe');
   const cards = w.document.querySelectorAll('#models-list .card');
   assert.ok(cards.length >= 25);
   assert.ok([...cards].every((c) => /^[0-5]$/.test(c.dataset.c)), 'ogni modello ha un colore');
