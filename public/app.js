@@ -92,7 +92,7 @@
   /* ------------------------------------------------------------------ */
   /* Navigazione                                                         */
   /* ------------------------------------------------------------------ */
-  const views = ['home', 'editor', 'run'];
+  const views = ['home', 'models', 'editor', 'run'];
   function show(name) {
     for (const v of views) $('#' + v).hidden = v !== name;
     document.body.classList.toggle('running-view', name === 'run');
@@ -115,7 +115,7 @@
     for (const w of workouts) {
       const tl = Core.buildTimeline(w);
       list.append(
-        h('article', { class: 'card' },
+        h('article', { class: 'card', 'data-c': w.color },
           h('button', { class: 'card-main', onclick: () => openRun(w.id), 'aria-label': 'Avvia ' + w.name },
             h('strong', {}, w.name),
             h('span', { class: 'meta' }, Core.summary(w))),
@@ -123,6 +123,31 @@
             h('span', { class: 'dur' }, tl.loop ? '∞' : Core.fmt(tl.total)),
             h('button', { class: 'btn ghost', onclick: () => openEditor(w.id) }, 'Modifica')))
       );
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Modelli                                                             */
+  /* ------------------------------------------------------------------ */
+  function renderModels() {
+    const box = $('#models-list');
+    box.replaceChildren();
+    for (const cat of Core.MODELS) {
+      const list = h('div', { class: 'list' });
+      for (const m of cat.items) {
+        const w = Core.sanitizeWorkout(m, false);
+        const tl = Core.buildTimeline(w);
+        list.append(
+          h('article', { class: 'card', 'data-c': w.color },
+            h('button', { class: 'card-main', onclick: () => openRun(w), 'aria-label': 'Avvia ' + w.name },
+              h('strong', {}, w.name),
+              h('span', { class: 'meta' }, Core.summary(w))),
+            h('div', { class: 'card-side' },
+              h('span', { class: 'dur' }, tl.loop ? '∞' : Core.fmt(tl.total)),
+              h('button', { class: 'btn ghost', onclick: () => { workouts.push(Core.sanitizeWorkout(m, false)); saveWorkouts(); renderHome(); toast('«' + w.name + '» aggiunto ai tuoi allenamenti'); } }, 'Aggiungi')))
+        );
+      }
+      box.append(h('h2', { class: 'cat' }, cat.cat), list);
     }
   }
 
@@ -601,8 +626,8 @@
     return S.audioMode === 'duck' || S.audioMode === 'clip' ? 4000 : 90000;
   }
 
-  function openRun(id) {
-    const w = workouts.find((x) => x.id === id);
+  function openRun(idOrWorkout) {
+    const w = typeof idOrWorkout === 'string' ? workouts.find((x) => x.id === idOrWorkout) : idOrWorkout;
     if (!w) return;
     const tl = Core.buildTimeline(w);
     if (!tl.segs.length) { toast('Allenamento vuoto'); return; }
@@ -879,6 +904,8 @@
     show('home');
 
     $('#btn-new').addEventListener('click', () => openEditor(null));
+    $('#btn-models').addEventListener('click', () => { renderModels(); show('models'); });
+    $('#models-back').addEventListener('click', () => show('home'));
     const openSettings = () => { syncSettingsUI(); $('#settings').showModal(); };
     $('#btn-settings').addEventListener('click', openSettings);
     $('#run-settings').append($('#btn-settings svg').cloneNode(true));

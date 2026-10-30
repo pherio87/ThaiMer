@@ -609,6 +609,42 @@ t('app: il link di condivisione punta al sito pubblico, non a https://localhost;
   });
 });
 
+t('modelli: schermata per categorie, avvio al volo senza salvare, «Aggiungi» li mette tra i miei', () => {
+  const { q, w, advance } = boot();
+  q('#btn-models').click();
+  assert.strictEqual(q('#models').hidden, false);
+  assert.strictEqual(q('#home').hidden, true);
+  const cats = [...w.document.querySelectorAll('#models-list .cat')].map((h) => h.textContent);
+  assert.ok(cats.includes('HIIT e cardio') && cats.includes('Boxe e arti marziali') && cats.length >= 6, cats.join(','));
+  const cards = w.document.querySelectorAll('#models-list .card');
+  assert.ok(cards.length >= 25);
+  assert.ok([...cards].every((c) => /^[0-5]$/.test(c.dataset.c)), 'ogni modello ha un colore');
+  const mine = () => w.document.querySelectorAll('#list .card').length;
+  assert.strictEqual(mine(), 6);
+
+  // avvio al volo: parte l'allenamento ma la lista dell'utente non cambia
+  const fgb = [...cards].find((c) => c.textContent.includes('Cinque stazioni'));
+  fgb.querySelector('.card-main').click();
+  assert.strictEqual(q('#run').hidden, false);
+  q('#run-toggle').click();
+  advance(100);
+  assert.strictEqual(q('#run-phase').textContent, 'PREPARATI');
+  q('#run-close').click();
+  assert.strictEqual(mine(), 6, 'avviare un modello non lo salva');
+
+  // aggiunta: compare in home con il suo colore
+  q('#btn-models').click();
+  const tab = [...w.document.querySelectorAll('#models-list .card')].find((c) => c.textContent.includes('Tabata'));
+  tab.querySelector('.btn').click();
+  assert.strictEqual(mine(), 7);
+  assert.ok(q('#toast').textContent.includes('aggiunto'));
+  q('#models-back').click();
+  assert.strictEqual(q('#home').hidden, false);
+  const added = [...w.document.querySelectorAll('#list .card')].pop();
+  assert.ok(added.textContent.includes('Tabata') && added.dataset.c === '1');
+  assert.strictEqual(JSON.parse(w.localStorage.getItem('gymtimer.workouts.v1')).length, 7);
+});
+
 Promise.all(pending).then(
   () => console.log('\n' + passed + ' test UI superati'),
   (e) => { console.error(e); process.exit(1); }

@@ -10,6 +10,8 @@
   --danger: #ff5d5d;
   --radius: 16px;
   --phase: #0b0f14;
+  /* strisce dei timer: tavolozza del brand (arancio inchiostro, petrolio, oro, rosso, viola, verde) */
+  --c0: #ff6b2c; --c1: #2bb3c0; --c2: #f2b632; --c3: #e5484d; --c4: #9b6dff; --c5: #4cc38a;
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
@@ -61,9 +63,18 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* ---------- elenco ---------- */
 .list { display: grid; gap: 12px; }
 .card {
+  --c: var(--c0);
   display: grid; grid-template-columns: 1fr auto; align-items: stretch;
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+  background: var(--surface); border: 1px solid var(--line); border-left: 6px solid var(--c); border-radius: var(--radius); overflow: hidden;
 }
+.card[data-c="1"] { --c: var(--c1); }
+.card[data-c="2"] { --c: var(--c2); }
+.card[data-c="3"] { --c: var(--c3); }
+.card[data-c="4"] { --c: var(--c4); }
+.card[data-c="5"] { --c: var(--c5); }
+.cat { margin: 24px 4px 10px; font-size: .85rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.cat:first-child { margin-top: 8px; }
+#models-list .list { margin-bottom: 4px; }
 .card-main {
   text-align: left; background: none; border: 0; padding: 16px; cursor: pointer;
   display: grid; gap: 4px; min-height: 72px;
@@ -71,7 +82,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .card-main strong { font-size: 1.1rem; }
 .meta { color: var(--muted); font-size: .9rem; }
 .card-side { display: grid; justify-items: end; align-content: space-between; padding: 12px 12px 12px 0; gap: 8px; }
-.dur { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 700; }
+.dur { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--c, var(--accent)); font-weight: 700; }
 .card-side .btn { min-height: 40px; padding: 0 12px; font-size: .9rem; }
 .empty { color: var(--muted); text-align: center; padding: 32px 0; }
 .hint { color: var(--muted); font-size: .9rem; margin: 24px 4px 0; }
