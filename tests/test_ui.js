@@ -95,10 +95,10 @@ function boot(opts = {}) {
 }
 
 // ---------------------------------------------------------------------------
-t('home: mostra i 6 allenamenti di esempio con durata', () => {
+t('home: i Preferiti partono con 3 allenamenti di esempio, con durata', () => {
   const { q, w } = boot();
   const cards = w.document.querySelectorAll('#list .card');
-  assert.strictEqual(cards.length, 6);
+  assert.strictEqual(cards.length, 3);
   assert.ok(q('#list').textContent.includes('Tabata'));
   assert.ok(q('#list').textContent.includes('4:00'));
 });
@@ -277,7 +277,7 @@ t('modalità «Background garantito»: avvia l\'audio di mantenimento', () => {
 
 t('editor: crea un allenamento, salva, appare in home e il totale si aggiorna', () => {
   const { q, w } = boot();
-  q('#btn-new').click();
+  q('.js-new').click();
   assert.strictEqual(q('#editor').hidden, false);
   const f = q('#ed-form');
   f.elements.name.value = 'Mio circuito';
@@ -295,7 +295,7 @@ t('editor: crea un allenamento, salva, appare in home e il totale si aggiorna', 
   f.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
   assert.strictEqual(q('#home').hidden, false);
   assert.ok(q('#list').textContent.includes('Mio circuito'));
-  assert.strictEqual(w.document.querySelectorAll('#list .card').length, 7);
+  assert.strictEqual(w.document.querySelectorAll('#list .card').length, 4);
 });
 
 t('play/pausa: l\'icona segue lo stato', () => {
@@ -312,7 +312,7 @@ t('play/pausa: l\'icona segue lo stato', () => {
 
 t('loop: dall\'editor, nasconde i campi inutili e l\'allenamento non finisce dopo 1 ora', () => {
   const { q, w, advance } = boot();
-  q('#btn-new').click();
+  q('.js-new').click();
   const f = q('#ed-form');
   f.elements.name.value = 'Senza fine';
   f.elements.work.value = '40';
@@ -357,13 +357,13 @@ t('importa da link condiviso: mostra la conferma e aggiunge l\'allenamento senza
   const dlg = q('#import');
   dlg.returnValue = 'yes';
   dlg.dispatchEvent(new w.Event('close'));
-  assert.strictEqual(w.document.querySelectorAll('#list .card').length, 7);
+  assert.strictEqual(w.document.querySelectorAll('#list .card').length, 4);
   assert.strictEqual(q('#list').querySelector('b'), null, 'nessun HTML iniettato nella lista');
 });
 
 t('link non valido: nessun crash, avviso all\'utente', () => {
   const { q, w } = boot({ hash: '#w=%%%' });
-  assert.strictEqual(w.document.querySelectorAll('#list .card').length, 6);
+  assert.strictEqual(w.document.querySelectorAll('#list .card').length, 3);
   const { q: q2 } = boot({ hash: '#w=AAAA' });
   assert.ok(q2('#toast').textContent.includes('non valido'));
 });
@@ -611,7 +611,7 @@ t('app: il link di condivisione punta al sito pubblico, non a https://localhost;
 
 t('modelli: schermata per categorie, avvio al volo senza salvare, «Aggiungi» li mette tra i miei', () => {
   const { q, w, advance } = boot();
-  q('#btn-models').click();
+  q('#tab-models').click();
   assert.strictEqual(q('#models').hidden, false);
   assert.strictEqual(q('#home').hidden, true);
   const cats = [...w.document.querySelectorAll('#models-list .cat')].map((h) => h.textContent);
@@ -621,7 +621,7 @@ t('modelli: schermata per categorie, avvio al volo senza salvare, «Aggiungi» l
   assert.ok(cards.length >= 25);
   assert.ok([...cards].every((c) => /^[0-5]$/.test(c.dataset.c)), 'ogni modello ha un colore');
   const mine = () => w.document.querySelectorAll('#list .card').length;
-  assert.strictEqual(mine(), 6);
+  assert.strictEqual(mine(), 3);
 
   // avvio al volo: parte l'allenamento ma la lista dell'utente non cambia
   const fgb = [...cards].find((c) => c.textContent.includes('Cinque stazioni'));
@@ -631,19 +631,92 @@ t('modelli: schermata per categorie, avvio al volo senza salvare, «Aggiungi» l
   advance(100);
   assert.strictEqual(q('#run-phase').textContent, 'PREPARATI');
   q('#run-close').click();
-  assert.strictEqual(mine(), 6, 'avviare un modello non lo salva');
+  assert.strictEqual(mine(), 3, 'avviare un modello non lo salva');
 
   // aggiunta: compare in home con il suo colore
-  q('#btn-models').click();
-  const tab = [...w.document.querySelectorAll('#models-list .card')].find((c) => c.textContent.includes('Tabata'));
-  tab.querySelector('.btn').click();
-  assert.strictEqual(mine(), 7);
+  q('#tab-models').click();
+  const card = (n) => [...w.document.querySelectorAll('#models-list .card')].find((c) => c.querySelector('strong').textContent === n);
+  assert.ok(card('Tabata').querySelector('.btn').disabled, 'già nei preferiti: pulsante disattivato');
+  assert.ok(card('Tabata').textContent.includes('♥'));
+  card('Sacco pesante').querySelector('.btn').click();
+  assert.strictEqual(mine(), 4);
+  assert.ok(card('Sacco pesante').querySelector('.btn').disabled, 'dopo l\'aggiunta il cuore si riempie');
   assert.ok(q('#toast').textContent.includes('aggiunto'));
-  q('#models-back').click();
+  q('#tab-home').click();
   assert.strictEqual(q('#home').hidden, false);
   const added = [...w.document.querySelectorAll('#list .card')].pop();
-  assert.ok(added.textContent.includes('Tabata') && added.dataset.c === '1');
-  assert.strictEqual(JSON.parse(w.localStorage.getItem('gymtimer.workouts.v1')).length, 7);
+  assert.ok(added.textContent.includes('Sacco pesante') && added.dataset.c === '4');
+  assert.strictEqual(JSON.parse(w.localStorage.getItem('gymtimer.workouts.v1')).length, 4);
+});
+
+t('barra in basso: Preferiti, Modelli, Impostazioni; in alto solo cerca e nuovo; visibile solo nelle schermate principali', () => {
+  const { q, w } = boot();
+  const cur = () => [...w.document.querySelectorAll('.tab')].filter((b) => b.hasAttribute('aria-current')).map((b) => b.id);
+  assert.deepStrictEqual([...w.document.querySelectorAll('.tab')].map((b) => b.id), ['tab-home', 'tab-models', 'btn-settings']);
+  assert.strictEqual(q('#tabbar').hidden, false);
+  assert.deepStrictEqual(cur(), ['tab-home']);
+  assert.strictEqual(q('#home .bar-actions').children.length, 2, 'in alto solo cerca e nuovo');
+  q('#tab-models').click();
+  assert.deepStrictEqual(cur(), ['tab-models']);
+  q('#btn-settings').click();
+  assert.ok(q('#settings').hasAttribute('open'));
+  assert.deepStrictEqual(cur(), ['tab-models'], 'le impostazioni non cambiano la schermata');
+  q('#tab-home').click();
+  assert.deepStrictEqual(cur(), ['tab-home']);
+  q('.js-new').click();
+  assert.strictEqual(q('#tabbar').hidden, true, 'nascosta nell\'editor');
+  q('#ed-cancel').click();
+  assert.strictEqual(q('#tabbar').hidden, false);
+  startTabata(q);
+  assert.strictEqual(q('#tabbar').hidden, true, 'nascosta durante l\'allenamento');
+});
+
+t('tasto indietro: dalle altre schermate torna ai Preferiti, in allenamento chiede conferma', () => {
+  const { q, w, advance } = boot();
+  const back = () => w.dispatchEvent(new w.PopStateEvent('popstate'));
+  q('#tab-models').click();
+  assert.strictEqual(w.history.state && w.history.state.v, 'models', 'una voce di cronologia in più');
+  back();
+  assert.strictEqual(q('#home').hidden, false);
+  assert.strictEqual(q('#models').hidden, true);
+  back(); // già nei Preferiti: non intercettiamo, il telefono chiude l'app
+  assert.strictEqual(q('#home').hidden, false);
+  q('.js-new').click();
+  back();
+  assert.strictEqual(q('#home').hidden, false);
+  startTabata(q);
+  advance(500);
+  w.confirm = () => false;
+  back();
+  assert.strictEqual(q('#run').hidden, false, 'senza conferma resta nell\'allenamento');
+  assert.strictEqual(q('#run-phase').textContent, 'PREPARATI');
+  w.confirm = () => true;
+  back();
+  assert.strictEqual(q('#home').hidden, false);
+});
+
+t('cerca: filtra Preferiti e Modelli per nome', () => {
+  const { q, w } = boot();
+  const input = q('#q-home');
+  assert.strictEqual(input.hidden, true);
+  q('#home .js-search').click();
+  assert.strictEqual(input.hidden, false);
+  input.value = 'tab';
+  input.dispatchEvent(new w.Event('input'));
+  const names = () => [...w.document.querySelectorAll('#list .card strong')].map((e) => e.textContent);
+  assert.deepStrictEqual(names(), ['Tabata']);
+  input.value = 'zzz';
+  input.dispatchEvent(new w.Event('input'));
+  assert.ok(q('#list').textContent.includes('Nessun risultato'));
+  q('#home .js-search').click(); // chiude e azzera il filtro
+  assert.strictEqual(names().length, 3);
+  q('#tab-models').click();
+  q('#models .js-search').click();
+  const mi = q('#q-models');
+  mi.value = 'muay';
+  mi.dispatchEvent(new w.Event('input'));
+  assert.ok([...w.document.querySelectorAll('#models-list .card strong')].some((e) => e.textContent === 'Muay thai'));
+  assert.deepStrictEqual([...w.document.querySelectorAll('#models-list .cat')].map((e) => e.textContent), ['Muay Thai e Boxe']);
 });
 
 Promise.all(pending).then(
