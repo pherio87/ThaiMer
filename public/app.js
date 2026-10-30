@@ -51,7 +51,7 @@
   /* App nativa (Capacitor)                                              */
   /* ------------------------------------------------------------------ */
   // Nell'app Android la pagina gira in una WebView e parla con il plugin nativo «ThaimerNative»
-  // (android/app/src/main/java/it/thaimer/app): priorità audio, servizio in primo piano con notifica,
+  // (android/app/src/main/java/thaimer/app): priorità audio, servizio in primo piano con notifica,
   // schermo acceso. Sul web `available` è false e ogni chiamata non fa nulla.
   const Native = (function () {
     const C = window.Capacitor;
@@ -63,7 +63,7 @@
     return { available, call, onAction };
   })();
   // Indirizzo pubblico del sito per i link di condivisione: nell'app nativa location.origin è https://localhost.
-  const SITE_URL = '';
+  const SITE_URL = 'https://thaimer.pherio.net/';
 
   /* ------------------------------------------------------------------ */
   /* Dati                                                                */
@@ -205,12 +205,11 @@
 
   function shareLink(w) {
     const base = Native.available ? SITE_URL : location.origin + location.pathname;
-    return base ? base + '#w=' + Core.encodeShare(w) : '';
+    return base + '#w=' + Core.encodeShare(w);
   }
 
   async function shareWorkout(w) {
     const url = shareLink(w);
-    if (!url) { toast('Condivisione non ancora disponibile in questa versione'); return; }
     try {
       if (navigator.share) {
         await navigator.share({ title: 'Thaimer: ' + w.name, text: 'Allenamento «' + w.name + '» per Thaimer', url });

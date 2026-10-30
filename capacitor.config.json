@@ -1,5 +1,5 @@
 {
-  "appId": "it.thaimer.app",
+  "appId": "thaimer.app",
   "appName": "Thaimer",
   "webDir": "public",
   "android": {

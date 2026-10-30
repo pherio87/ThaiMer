@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Thaimer</string>
     <string name="title_activity_main">Thaimer</string>
-    <string name="package_name">it.thaimer.app</string>
-    <string name="custom_url_scheme">it.thaimer.app</string>
+    <string name="package_name">thaimer.app</string>
+    <string name="custom_url_scheme">thaimer.app</string>
 </resources>

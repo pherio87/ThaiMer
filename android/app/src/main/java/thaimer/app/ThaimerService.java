@@ -1,4 +1,4 @@
-package it.thaimer.app;
+package thaimer.app;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -28,9 +28,9 @@ public class ThaimerService extends Service {
     static final String EXTRA_TITLE = "title";
     static final String EXTRA_TEXT = "text";
     static final String EXTRA_PAUSED = "paused";
-    static final String ACTION_PAUSE = "it.thaimer.app.PAUSE";
-    static final String ACTION_RESUME = "it.thaimer.app.RESUME";
-    static final String ACTION_STOP = "it.thaimer.app.STOP";
+    static final String ACTION_PAUSE = "thaimer.app.PAUSE";
+    static final String ACTION_RESUME = "thaimer.app.RESUME";
+    static final String ACTION_STOP = "thaimer.app.STOP";
 
     // rete di sicurezza: il blocco della CPU non resta mai attivo oltre questo limite
     private static final long WAKE_LOCK_MAX_MS = 6L * 60 * 60 * 1000;
