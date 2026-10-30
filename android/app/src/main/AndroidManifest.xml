@@ -41,9 +41,18 @@
         </provider>
     </application>
 
+    <!-- Android 11+: senza questo non vediamo il motore di sintesi vocale installato (TextToSpeech) -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Vibrazione: senza questo permesso navigator.vibrate nella WebView non fa nulla -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Servizio in primo piano durante l'allenamento, con notifica e CPU sveglia a schermo spento -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />

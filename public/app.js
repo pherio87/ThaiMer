@@ -345,7 +345,8 @@
      In «clip» la finestra è tenuta da un clip silenzioso di 1 s in loop (breve, come i bip, perché Android
      lo tratti come priorità transitoria e abbassi la musica invece di fermarla).
      In «native» la finestra è del plugin Android (audio focus MAY_DUCK): i bip, programmati in anticipo, gli
-     arrivano con duckAt e li gestisce con i suoi timer; la voce, che parte a eventi, apre e chiude con duckSet. */
+     arrivano con duckAt e li gestisce con i suoi timer; la voce è del plugin stesso (speak), che apre e chiude
+     la finestra da solo. */
   const DUCK_PAD = 500;
   let duckOn = false;
   let duckUntil = 0;
@@ -358,7 +359,6 @@
     if (on === duckOn) return;
     duckOn = on;
     if (S.audioMode === 'duck') setSession(on ? 'transient' : 'ambient');
-    if (S.audioMode === 'native') Native.call('duckSet', { on });
     if (S.audioMode === 'clip') {
       if (on) {
         holdEl = new Audio();
@@ -437,7 +437,16 @@
     if (!('speechSynthesis' in window)) return null;
     return speechSynthesis.getVoices().find((v) => v.lang && v.lang.toLowerCase().startsWith('it')) || null;
   }
+  // Nell'app la voce è il motore di sintesi di Android (speechSynthesis nella WebView non parla).
+  let voiceWarned = false;
   function speak(text) {
+    if (Native.available) {
+      if (!S.voice || !text) return;
+      Native.call('speak', { text, volume: Math.max(0.05, S.volume), duck: S.audioMode === 'native' }).then((r) => {
+        if (r && r.ok === false && !voiceWarned) { voiceWarned = true; toast('Voce non disponibile: sul telefono manca un motore di sintesi vocale'); }
+      });
+      return;
+    }
     if (!S.voice || !('speechSynthesis' in window) || !text) return;
     try {
       speechSynthesis.cancel();
@@ -447,7 +456,7 @@
       if (v) u.voice = v;
       u.rate = 1.05;
       u.volume = Math.max(0.05, S.volume);
-      if (S.audioMode === 'duck' || S.audioMode === 'clip' || S.audioMode === 'native') {
+      if (S.audioMode === 'duck' || S.audioMode === 'clip') {
         // onend su Android a volte non arriva: la durata stimata dalla lunghezza del testo è il limite massimo
         u.onstart = () => { speaking = u; speechUntil = Date.now() + 1500 + text.length * 90; duckSet(true); duckCheck(); };
         const back = () => {
@@ -463,6 +472,10 @@
     } catch (e) { /* voce non disponibile */ }
   }
   if ('speechSynthesis' in window) speechSynthesis.getVoices();
+  function cancelSpeech() {
+    Native.call('speakStop');
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+  }
 
   function vibrate(pattern) {
     if (S.vibrate && pattern && navigator.vibrate) navigator.vibrate(pattern);
@@ -665,7 +678,7 @@
     run.pos = curPos();
     run.state = 'paused';
     cancelScheduled();
-    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    cancelSpeech();
     keepAlivePause();
     nativeRunState();
     render(run.pos);
@@ -691,7 +704,7 @@
     ms = Math.max(0, Math.min(run.tl.total - 1, ms));
     const wasRunning = run.state === 'running';
     cancelScheduled();
-    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    cancelSpeech();
     run.pos = ms;
     run.base = ms;
     run.t0 = Date.now();
@@ -732,7 +745,7 @@
     clearInterval(run.ticker);
     clearTimeout(run.endTimer);
     cancelScheduled();
-    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    cancelSpeech();
     unlockScreen();
     keepAliveStop();
     setSession('auto');
