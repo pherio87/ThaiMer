@@ -123,11 +123,13 @@
         <legend>Audio e musica di altre app</legend>
         <label class="mode"><input type="radio" name="audioMode" value="mix">
           <span><strong>Affiancato</strong><small>I suoni si sovrappongono alla musica senza abbassarla. Non interrompe mai la musica.</small></span></label>
-        <label class="mode"><input type="radio" name="audioMode" value="clip">
+        <label class="mode" data-only="native"><input type="radio" name="audioMode" value="native">
+          <span><strong>Abbassa la musica</strong><small>Chiede ad Android la priorità audio mentre suonano i bip e la voce: Spotify e simili abbassano il volume e poi lo rialzano. Se la tua app musicale va in pausa invece di abbassarsi, torna su «Affiancato».</small></span></label>
+        <label class="mode" data-only="web"><input type="radio" name="audioMode" value="clip">
           <span><strong>Abbassa la musica (Android)</strong><small>Riproduce i suoni come brevi clip audio: su Android Spotify e simili possono abbassare il volume. Da provare, potrebbero invece andare in pausa. Funziona con l'app aperta.</small></span></label>
-        <label class="mode"><input type="radio" name="audioMode" value="duck">
+        <label class="mode" data-only="web"><input type="radio" name="audioMode" value="duck">
           <span><strong>Abbassa la musica (iPhone)</strong><small>Usa la sessione audio di Safari. Pensata per iPhone, su Android di solito non ha effetto.</small></span></label>
-        <label class="mode"><input type="radio" name="audioMode" value="bg">
+        <label class="mode" data-only="web"><input type="radio" name="audioMode" value="bg">
           <span><strong>Background garantito</strong><small>Tiene attiva l'app anche con altre app in primo piano, con comandi nella notifica. Può mettere in pausa la musica.</small></span></label>
       </fieldset>
 
