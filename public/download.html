@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scarica Thaimer per Android</title>
+  <meta name="description" content="Scarica l'app Android di Thaimer: timer a intervalli per allenamenti, con la musica che si abbassa, la voce e i comandi nella notifica.">
+  <meta name="theme-color" content="#0b0f14">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    main { max-width: 680px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1, h2 { line-height: 1.2; }
+    h1 { display: flex; align-items: center; gap: 12px; font-size: 1.9rem; margin: 0 0 16px; }
+    h1 img { width: 48px; height: 48px; border-radius: 12px; }
+    h2 { font-size: 1.25rem; margin: 28px 0 8px; }
+    a { color: var(--accent); }
+    .lead { font-size: 1.05rem; }
+    .btn.big { display: inline-flex; align-items: center; justify-content: center; min-height: 56px; padding: 0 28px; font-size: 1.1rem; text-decoration: none; text-align: center; }
+    .btn[aria-disabled="true"] { opacity: .5; pointer-events: none; }
+    .note { color: var(--muted); font-size: .9rem; margin: 8px 0 0; }
+    ol { padding-left: 1.3rem; }
+    li { margin: 6px 0; }
+    .links { margin-top: 32px; color: var(--muted); font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1><img src="icons/icon-192.png" alt="" width="48" height="48">Thaimer per Android</h1>
+    <p class="lead">Il timer a intervalli per allenamenti (HIIT, Tabata, circuiti, round di boxe) come app: va avanti anche con lo schermo spento, abbassa la musica mentre senti bip e voce e ha i pulsanti Pausa e Termina nella notifica.</p>
+
+    <p><a id="dl" class="btn primary big" href="thaimer.apk" download="thaimer.apk">Scarica thaimer.apk</a></p>
+    <p id="dl-note" class="note">Android 7.0 o successivo · funziona anche senza connessione · nessun account</p>
+
+    <h2>Come installarla</h2>
+    <ol>
+      <li>Tocca «Scarica thaimer.apk». Se il browser avvisa che il file potrebbe essere dannoso, scegli «Scarica comunque».</li>
+      <li>Aprilo dalla notifica del download o dall'app File (cartella Download).</li>
+      <li>Se Android lo chiede, consenti l'installazione di app da questa fonte (il browser che stai usando).</li>
+      <li>Se compare l'avviso di Play Protect, scegli «Maggiori dettagli» e poi «Installa comunque».</li>
+      <li>Apri Thaimer. Al primo allenamento accetta il permesso per le notifiche: serve per i pulsanti Pausa e Termina.</li>
+    </ol>
+    <p class="note">Gli avvisi compaiono perché l'app non viene dal Play Store.</p>
+
+    <h2>Aggiornare</h2>
+    <p>Quando esce una versione nuova, scarica di nuovo il file e installalo sopra quella che hai: allenamenti e impostazioni restano.</p>
+
+    <h2>iPhone</h2>
+    <p>Per iPhone non c'è un'app. Apri <a href="./">thaimer.pherio.net</a> in Safari, tocca Condividi e scegli «Aggiungi a schermata Home».</p>
+
+    <p class="links"><a href="./">Usa Thaimer nel browser</a> · <a href="privacy.html">Privacy</a></p>
+  </main>
+
+  <script>
+    // Se il file non c'è ancora (o non si raggiunge), il pulsante lo dice invece di scaricare una pagina web
+    // salvata come .apk. Una HEAD non scarica il file.
+    (function () {
+      var btn = document.getElementById('dl');
+      var note = document.getElementById('dl-note');
+      fetch('thaimer.apk', { method: 'HEAD', cache: 'no-store' }).then(function (res) {
+        if (!res.ok || (res.headers.get('content-type') || '').indexOf('text/html') === 0) throw new Error('assente');
+        var bytes = Number(res.headers.get('content-length'));
+        if (bytes > 0) note.textContent += ' · ' + (bytes / 1048576).toFixed(1).replace('.', ',') + ' MB';
+      }).catch(function () {
+        btn.removeAttribute('href');
+        btn.removeAttribute('download');
+        btn.setAttribute('aria-disabled', 'true');
+        btn.textContent = 'Download non disponibile al momento';
+      });
+    })();
+  </script>
+</body>
+</html>
