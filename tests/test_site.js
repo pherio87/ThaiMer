@@ -24,6 +24,14 @@ t('download: il pulsante scarica thaimer.apk e il file ha quel nome', () => {
   assert.ok(html.includes('<html lang="it">') && html.includes('<title>Scarica Thaimer per Android</title>'));
 });
 
+t('download: pulsante e messaggio per Buy Me a Coffee, con collegamento sicuro', () => {
+  const html = read('download.html');
+  const a = html.match(/<a [^>]*href="https:\/\/buymeacoffee\.com\/pherio"[^>]*>/);
+  assert.ok(a, 'link a buymeacoffee.com/pherio');
+  assert.ok(/rel="noopener noreferrer"/.test(a[0]) && /target="_blank"/.test(a[0]), 'si apre in una scheda nuova senza passare il riferimento');
+  assert.ok(html.includes('puoi offrirmi un caffè'), 'messaggio');
+});
+
 t('download: tutti i collegamenti locali esistono', () => {
   const html = read('download.html');
   for (const u of localRefs(html)) {
