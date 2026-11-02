@@ -4,7 +4,7 @@
   "private": true,
   "description": "Thaimer: timer a intervalli per allenamenti (PWA e app Android)",
   "scripts": {
-    "test": "node tests/test_core.js && node tests/test_ui.js",
+    "test": "node tests/test_core.js && node tests/test_site.js && node tests/test_ui.js",
     "serve": "python3 -m http.server 8000 --directory public",
     "android:sync": "cap sync android",
     "android:open": "cap open android"

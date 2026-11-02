@@ -9,8 +9,9 @@ PWA statica (HTML/CSS/JS vanilla, nessuna build) con timer a intervalli per alle
 - `public/app.js`: interfaccia, audio, ciclo di vita dell'allenamento, impostazioni.
 - `public/sw.js`: service worker per l'uso offline. **A ogni modifica ai file di `public/` cambiare `CACHE` (es. `gym-timer-v3`)**, altrimenti i telefoni restano sulla versione vecchia.
 - `android/` + `capacitor.config.json`: app Android (Capacitor 8, `webDir: public`). Codice nativo scritto da noi: `android/app/src/main/java/thaimer/app/` (`ThaimerNativePlugin` = priorità audio, schermo acceso, notifica; `ThaimerService` = servizio in primo piano). Il resto è il progetto generato da Capacitor. `android/app/src/main/assets/public` è una copia generata (ignorata da git): la crea `npm run android:sync`, e la CI prima di compilare.
-- `.github/workflows/android.yml`: compila l'APK di prova a ogni push che tocca `public/` o `android/` e lo allega all'esecuzione.
-- `tests/`: `npm test` esegue i test della logica e un test dell'interfaccia in jsdom con orologio e audio simulati.
+- `.github/workflows/android.yml`: compila l'APK di prova a ogni push che tocca `public/` o `android/` e lo allega all'esecuzione. Avviato a mano con «pubblica» (solo da `main`, solo con i segreti della firma) compila l'APK di rilascio e lo committa come `public/thaimer.apk`.
+- `public/download.html` (`/download`): pagina per scaricare `thaimer.apk` (repository privato: niente Release di GitHub, l'APK sta sul sito). Se il file manca il pulsante si disattiva da solo (HEAD). In fondo c'è il pulsante per offrire un caffè (`buymeacoffee.com/pherio`): c'è solo qui, non nell'app (la politica del Play Store sui pagamenti rende rischiosi i link a donazioni dentro l'app). `public/404.html` spegne il ripiego «ogni indirizzo → index.html» di Cloudflare Pages: senza, un `/thaimer.apk` inesistente scaricherebbe una pagina web col nome `.apk`. Nella 404 i percorsi sono assoluti (esce a qualunque indirizzo).
+- `tests/`: `npm test` esegue i test della logica, quelli del sito (`test_site.js`: pagina di download, 404, service worker, pubblicazione) e un test dell'interfaccia in jsdom con orologio e audio simulati.
 
 ## Come funziona il tempo
 La posizione nella timeline (`pos`, in ms) si calcola con `Date.now()` da un'ancora (`base` + `t0`), quindi resta corretta anche se il browser rallenta i timer in background. I suoni vengono programmati in anticipo, non al momento.
@@ -44,3 +45,5 @@ Nell'app le modalità `clip`, `duck` e `bg` sono nascoste, e `native` è nascost
 
 ## Pubblicazione
 Cloudflare Pages collegato a questo repository: comando di build vuoto, cartella di output `public`. Ogni `git push` su `main` ripubblica.
+
+`public/thaimer.apk` lo scrive solo la CI (commit su `main` del flusso «pubblica»): non va aggiunto a mano, e quel commit non deve contenere `[skip ci]` (salterebbe anche Cloudflare). Il service worker non gestisce mai i file `.apk` (`sw.js`): dalla cache uscirebbe una versione vecchia. Poiché l'APK non è in `ASSETS` non serve cambiare `CACHE` quando cambia.
