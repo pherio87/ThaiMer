@@ -120,9 +120,11 @@
   </section>
 
   <!-- IMPOSTAZIONI -->
-  <dialog id="settings" aria-labelledby="set-title">
-    <form method="dialog" class="sheet">
-      <h2 id="set-title">Impostazioni</h2>
+  <section id="settings" class="view" hidden>
+    <header class="bar">
+      <h1>Impostazioni</h1>
+    </header>
+    <div class="sheet">
 
       <label class="row">
         <span>Volume suoni</span>
@@ -163,9 +165,9 @@
       </div>
       <p class="hint small">Per provare l'audio: avvia la musica in un'altra app, torna qui e premi «Prova suono e voce».</p>
 
-      <div class="row buttons end"><button class="btn primary" value="close">Chiudi</button></div>
-    </form>
-  </dialog>
+      <div class="row buttons end"><button class="btn primary" id="set-save">Salva</button></div>
+    </div>
+  </section>
 
   <!-- IMPORTA DA LINK -->
   <dialog id="import" aria-labelledby="imp-title">
