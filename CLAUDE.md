@@ -32,8 +32,7 @@ Nell'app le modalità `clip`, `duck` e `bg` sono nascoste, e `native` è nascost
 - `navigator.vibrate` nella WebView richiede il permesso `VIBRATE` nel manifest.
 - Dentro l'app non c'è service worker (i file sono nell'APK) e `location.origin` è `https://localhost`: i link di condivisione usano `SITE_URL` in `app.js` (`https://thaimer.pherio.net/`, il sito su Cloudflare Pages).
 - Un servizio in primo piano (con notifica Pausa/Termina) e il blocco della CPU durano quanto l'allenamento. La notifica richiede il permesso su Android 13+ (chiesto al primo avvio).
-- L'ID del pacchetto è `thaimer.app`; una volta pubblicata sul Play Store non si cambia più.
-- Firma: se nei segreti di GitHub ci sono `KEYSTORE_B64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, la CI firma con quella chiave sia l'APK di prova sia il `.aab` per il Play Store (allegato `thaimer-release-aab`); `versionCode` = numero dell'esecuzione. Senza segreti l'APK usa una chiave di debug diversa a ogni esecuzione (per aggiornare bisogna disinstallare). Il keystore non va MAI nel repository e va conservato dall'utente: perso quello, niente più aggiornamenti.
+- L'ID del pacchetto è `thaimer.app`.
 - Dopo una modifica al codice nativo o alla struttura di `android/` controlla che la CI sia verde: l'SDK Android non è disponibile negli ambienti cloud, la compilazione si prova lì.
 
 ## Regole
