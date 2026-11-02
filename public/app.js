@@ -57,10 +57,15 @@
     const C = window.Capacitor;
     const available = !!(C && C.isNativePlatform && C.isNativePlatform() && C.nativePromise);
     const call = (method, opts) => (available ? C.nativePromise('ThaimerNative', method, opts || {}).catch(() => null) : Promise.resolve(null));
+    // tasto indietro del telefono: con un ascoltatore registrato decidiamo noi cosa fare (plugin ufficiale App)
+    const onBack = (cb) => {
+      if (available && C.nativeCallback) C.nativeCallback('App', 'addListener', { eventName: 'backButton' }, () => cb());
+    };
+    const exit = () => (available ? C.nativePromise('App', 'exitApp').catch(() => null) : Promise.resolve(null));
     const onAction = (cb) => {
       if (available && C.nativeCallback) C.nativeCallback('ThaimerNative', 'addListener', { eventName: 'action' }, (d) => cb(d && d.action));
     };
-    return { available, call, onAction };
+    return { available, call, onAction, onBack, exit };
   })();
   // Indirizzo pubblico del sito per i link di condivisione: nell'app nativa location.origin è https://localhost.
   const SITE_URL = 'https://thaimer.pherio.net/';
@@ -92,19 +97,20 @@
   /* ------------------------------------------------------------------ */
   /* Navigazione                                                         */
   /* ------------------------------------------------------------------ */
-  const views = ['home', 'models', 'editor', 'run'];
+  const views = ['home', 'models', 'settings', 'editor', 'run'];
   // leaf = la cronologia ha una voce in più della home: «indietro» la toglie e torna ai Preferiti invece di chiudere l'app
   let leaf = false;
+  let settingsFrom = 'home'; // da dove si sono aperte le Impostazioni: i Preferiti (barra in basso) o l'allenamento in corso
   function show(name, fromPop) {
     for (const v of views) $('#' + v).hidden = v !== name;
     document.body.classList.toggle('running-view', name === 'run');
     if (name !== 'run') document.body.dataset.phase = 'idle';
     setThemeColor(name === 'run' ? getComputedStyle(document.body).getPropertyValue('--phase').trim() : '#0b0f14');
     window.scrollTo(0, 0);
-    const tabs = name === 'home' || name === 'models';
+    const tabs = name === 'home' || name === 'models' || (name === 'settings' && settingsFrom === 'home');
     document.body.classList.toggle('has-tabs', tabs);
     $('#tabbar').hidden = !tabs;
-    for (const [id, v] of [['tab-home', 'home'], ['tab-models', 'models']]) {
+    for (const [id, v] of [['tab-home', 'home'], ['tab-models', 'models'], ['btn-settings', 'settings']]) {
       if (name === v) $('#' + id).setAttribute('aria-current', 'page');
       else if (tabs) $('#' + id).removeAttribute('aria-current');
     }
@@ -817,7 +823,7 @@
     const ready = run.state === 'ready';
     const phase = done ? 'done' : ready ? 'ready' : g.type;
     document.body.dataset.phase = phase;
-    setThemeColor(getComputedStyle(document.body).getPropertyValue('--phase').trim());
+    if (!$('#run').hidden) setThemeColor(getComputedStyle(document.body).getPropertyValue('--phase').trim());
 
     $('#run-phase').textContent = done ? 'COMPLETATO' : ready ? 'PRONTO' : PHASE_NAME[g.type];
     const remainMs = done ? 0 : Math.ceil((g.end - pos) / 1000) * 1000;
@@ -944,28 +950,40 @@
     }
     $('#q-home').addEventListener('input', renderHome);
     $('#q-models').addEventListener('input', renderModels);
-    // tasto indietro del telefono: dalle altre schermate si torna ai Preferiti; dai Preferiti l'app si chiude
+    // Impostazioni: pagina intera. Le modifiche si applicano subito; «Salva» (o indietro) torna da dove si era arrivati.
+    function openSettings(from) {
+      settingsFrom = from;
+      syncSettingsUI();
+      show('settings');
+    }
+    function closeSettings() {
+      if (settingsFrom === 'run') { show('run'); render(curPos()); } else show('home');
+      // se si è cambiata la modalità audio a allenamento in corso, riprogramma i suoni con quella nuova
+      if (run.state === 'running') { ensureAudio(); resync(); }
+    }
+    $('#btn-settings').addEventListener('click', () => openSettings('home'));
+    $('#run-settings').append($('#btn-settings svg').cloneNode(true));
+    $('#run-settings').addEventListener('click', () => openSettings('run'));
+    $('#set-save').addEventListener('click', () => { closeSettings(); toast('Impostazioni salvate'); });
+
+    // Indietro: da Modelli, Impostazioni, editor e allenamento si torna ai Preferiti (dalle Impostazioni aperte
+    // in allenamento, all'allenamento); dai Preferiti non c'è nulla da fare: l'app si chiude (false).
+    function backToHome() {
+      if (!$('#home').hidden) return false;
+      if (!$('#settings').hidden) closeSettings();
+      else if (!$('#run').hidden) {
+        if ((run.state === 'running' || run.state === 'paused') && !confirm('Interrompere l\'allenamento?')) return true;
+        stopRun();
+      } else show('home');
+      return true;
+    }
+    Native.onBack(() => { if (!backToHome()) Native.exit(); });
+    // sul web (e come ripiego) il tasto indietro del browser percorre la cronologia: una sola voce in più della home
     window.addEventListener('popstate', () => {
       if (!leaf) return; // nostra history.back(): la home è già a schermo
       leaf = false;
-      if (!$('#run').hidden) {
-        if ((run.state === 'running' || run.state === 'paused') && !confirm('Interrompere l\'allenamento?')) {
-          leaf = true;
-          history.pushState({ v: 'run' }, '');
-          return;
-        }
-        stopRun();
-      } else show('home', true);
-    });
-    const openSettings = () => { syncSettingsUI(); $('#settings').showModal(); };
-    $('#btn-settings').addEventListener('click', openSettings);
-    $('#run-settings').append($('#btn-settings svg').cloneNode(true));
-    $('#run-settings').addEventListener('click', openSettings);
-    // se si cambia modalità audio a allenamento in corso, riprogramma i suoni con quella nuova
-    $('#settings').addEventListener('close', () => {
-      if (run.state !== 'running') return;
-      ensureAudio();
-      resync();
+      backToHome();
+      if (!leaf && !$('#run').hidden) { leaf = true; history.pushState({ v: 'run' }, ''); } // restiamo nell'allenamento: rimettiamo la voce
     });
 
     $('#ed-cancel').addEventListener('click', () => show('home'));
