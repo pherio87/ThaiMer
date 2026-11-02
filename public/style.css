@@ -167,6 +167,7 @@ dialog {
 }
 dialog::backdrop { background: rgba(0,0,0,.65); }
 .sheet { display: grid; gap: 14px; padding: 20px; }
+#settings .sheet { padding: 0; }
 .sheet h2 { margin: 0; font-size: 1.25rem; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .row.check { justify-content: flex-start; min-height: 44px; }
